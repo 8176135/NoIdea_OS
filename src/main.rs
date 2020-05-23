@@ -14,6 +14,7 @@ mod serial;
 mod interrupts;
 mod gdt;
 mod kernel;
+mod static_collections;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -22,14 +23,12 @@ pub extern "C" fn _start() -> ! {
 	#[cfg(test)]
 		crate::test_main();
 	
-	fn stack_overflow() {
-		stack_overflow(); // for each recursion, the return address is pushed
+	kernel::os_start();
+	
+	println!("Didn't quite crash");
+	loop {
+		x86_64::instructions::hlt();
 	}
-	
-	stack_overflow();
-	
-	panic!("Didn't quite crash");
-	loop {}
 }
 
 use core::panic::PanicInfo;
@@ -40,7 +39,9 @@ use core::panic::PanicInfo;
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
 	eprintln!("{}", info);
-	loop {}
+	loop {
+		x86_64::instructions::hlt();
+	}
 }
 
 // our panic handler in test mode

@@ -32,7 +32,7 @@ impl ColorCode {
 	}
 	
 	fn _background(&self) -> Color {
-		unsafe { core::mem::transmute(self.0 as u8 >> 4)}
+		unsafe { core::mem::transmute(self.0 as u8 >> 4) }
 	}
 	
 	fn _foreground(&self) -> Color {
@@ -181,20 +181,26 @@ macro_rules! eprintln {
     ($($arg:tt)*) => ($crate::eprint!("{}\n", format_args!($($arg)*)));
 }
 
+use x86_64::instructions::interrupts::without_interrupts;
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
 	use core::fmt::Write;
-	WRITER.lock().write_fmt(args).unwrap();
+	without_interrupts(|| {
+		WRITER.lock().write_fmt(args).unwrap();
+	});
 }
 
 #[doc(hidden)]
 pub fn _print_error(args: fmt::Arguments) {
 	use core::fmt::Write;
-	let mut writer = WRITER.lock();
-	let old = writer.color_code;
-	writer.color_code = ColorCode::ERROR;
-	writer.write_fmt(args).unwrap();
-	writer.color_code = old;
+	without_interrupts(|| {
+		let mut writer = WRITER.lock();
+		let old = writer.color_code;
+		writer.color_code = ColorCode::ERROR;
+		writer.write_fmt(args).unwrap();
+		writer.color_code = old;
+	});
 }
 
 
@@ -220,26 +226,28 @@ fn test_println_many() {
 #[test_case]
 fn test_println_output() {
 	serial_print!("test_println_output... ");
-	
-	WRITER.lock().clear_screen();
-	
-	let s = "Some test string that fits on a single line";
-	println!("\n{}", s);
-	for (i, c) in s.chars().enumerate() {
-		let screen_char = WRITER.lock().buffer.chars[1][i].read();
-		assert_eq!(char::from(screen_char.ascii_character), c);
-	}
-	
-	for _ in 0..BUFFER_HEIGHT - 3 {
-		println!();
-	}
-	
-	println!("{}", s);
-	
-	for (i, c) in s.chars().enumerate() {
-		let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
-		assert_eq!(char::from(screen_char.ascii_character), c);
-	}
-	
+	without_interrupts(|| {
+		use core::fmt::Write;
+		let mut writer_guard = WRITER.lock();
+		writer_guard.clear_screen();
+		
+		let s = "Some test string that fits on a single line";
+		writeln!(writer_guard, "\n{}", s).expect("Failed to write to vga");
+		for (i, c) in s.chars().enumerate() {
+			let screen_char = writer_guard.buffer.chars[1][i].read();
+			assert_eq!(char::from(screen_char.ascii_character), c);
+		}
+		
+		for _ in 0..BUFFER_HEIGHT - 3 {
+			writeln!(writer_guard);
+		}
+		
+		writeln!(writer_guard, "{}", s);
+		
+		for (i, c) in s.chars().enumerate() {
+			let screen_char = writer_guard.buffer.chars[BUFFER_HEIGHT - 2][i].read();
+			assert_eq!(char::from(screen_char.ascii_character), c);
+		}
+	});
 	serial_println!("[ok]");
 }
