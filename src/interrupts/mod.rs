@@ -18,6 +18,7 @@ pub fn interrupt_init() {
 fn create_idt() -> InterruptDescriptorTable {
 	let mut idt = InterruptDescriptorTable::new();
 	idt.breakpoint.set_handler_fn(cpu::breakpoint_handler);
+	idt.page_fault.set_handler_fn(cpu::page_fault_handler);
 	unsafe {
 		idt.double_fault.set_handler_fn(cpu::double_fault_handler)
 			.set_stack_index(crate::gdt::DOUBLE_FAULT_IST_INDEX);
