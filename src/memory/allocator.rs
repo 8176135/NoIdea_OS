@@ -1,12 +1,13 @@
+pub mod fixed_pow2_block;
+
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use x86_64::structures::paging::{Mapper, Size4KiB, FrameAllocator, mapper::MapToError, Page, PageTableFlags};
 use x86_64::VirtAddr;
-use linked_list_allocator::LockedHeap;
 
 //  These are virtual addresses
 pub const HEAP_START: usize = 0x_1313_1313_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+pub const HEAP_SIZE: usize = 1024 * 1024; // 100 KiB
 
 pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>)
 	-> Result<(), MapToError<Size4KiB>> {
@@ -36,5 +37,84 @@ pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl 
 	Ok(())
 }
 
+use fixed_pow2_block::FixedSizeBlockAllocator;
+
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(
+	FixedSizeBlockAllocator::new());
+
+/// Align the given address `addr` upwards to alignment `align`.
+///
+/// Requires that `align` is a power of two.
+fn align_up(addr: usize, align: usize) -> usize {
+	(addr + align - 1) & !(align - 1)
+}
+
+pub struct Locked<A> {
+	inner: spin::Mutex<A>,
+}
+
+impl<A> Locked<A> {
+	pub const fn new(inner: A) -> Self {
+		Locked {
+			inner: spin::Mutex::new(inner),
+		}
+	}
+	
+	pub fn lock(&self) -> spin::MutexGuard<A> {
+		self.inner.lock()
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::{serial_println, serial_print};
+	use super::HEAP_SIZE;
+	use alloc::boxed::Box;
+	
+	#[test_case]
+	fn simple_allocation() {
+		serial_print!("simple_allocation... ");
+		let heap_value_1 = Box::new(41);
+		let heap_value_2 = Box::new(13);
+		assert_eq!(*heap_value_1, 41);
+		assert_eq!(*heap_value_2, 13);
+		serial_println!("[ok]");
+	}
+	
+	use alloc::vec::Vec;
+	
+	#[test_case]
+	fn large_vec() {
+		serial_print!("large_vec... ");
+		let n = 1000;
+		let mut vec = Vec::new();
+		for i in 0..n {
+			vec.push(i);
+		}
+		assert_eq!(vec.iter().sum::<u64>(), (n - 1) * n / 2);
+		serial_println!("[ok]");
+	}
+	
+	#[test_case]
+	fn many_boxes() {
+		serial_print!("many_boxes... ");
+		for i in 0..HEAP_SIZE {
+			let x = Box::new(i);
+			assert_eq!(*x, i);
+		}
+		serial_println!("[ok]");
+	}
+	
+	#[test_case]
+	fn many_boxes_long_lived() {
+		serial_print!("many_boxes_long_lived... ");
+		let long_lived = Box::new(1);
+		for i in 0..HEAP_SIZE {
+			let x = Box::new(i);
+			assert_eq!(*x, i);
+		}
+		assert_eq!(*long_lived, 1);
+		serial_println!("[ok]");
+	}
+}
