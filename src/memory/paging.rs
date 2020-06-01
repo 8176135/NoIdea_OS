@@ -1,5 +1,5 @@
 use x86_64::{VirtAddr, PhysAddr};
-use x86_64::structures::paging::{PageTable, OffsetPageTable, Page, FrameAllocator, Size4KiB, PhysFrame, Mapper};
+use x86_64::structures::paging::{PageTable, OffsetPageTable, FrameAllocator, Size4KiB, PhysFrame};
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 
 pub struct EmptyFrameAllocator;

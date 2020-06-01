@@ -36,7 +36,7 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut Inte
 	
 	let mut port = Port::new(0x60);
 	let scancode: u8 = unsafe { port.read() };
-	use x86_64::instructions;
+	
 	let mut keyboard: MutexGuard<Keyboard<_, _>> = KEYBOARD.lock();
 	if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
 		if let Some(key) = keyboard.process_keyevent(key_event) {

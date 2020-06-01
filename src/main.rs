@@ -19,7 +19,8 @@ mod serial;
 mod interrupts;
 mod gdt;
 mod kernel;
-mod static_collections;
+// mod static_collections;
+mod special_collections;
 
 #[no_mangle]
 pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
@@ -38,8 +39,6 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 	#[cfg(test)]
 		crate::test_main();
 	
-	let x = Box::new(4);
-	println!("{:?}", Box::into_raw(x));
 	kernel::os_start();
 	
 	println!("Didn't quite crash");
@@ -50,9 +49,7 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
-use x86_64::structures::paging::{PageTable, MapperAllSizes, Mapper, Page};
 use crate::memory::paging::BootInfoFrameAllocator;
-use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
 
 /// This function is called on panic.
 

@@ -1,7 +1,6 @@
 use core::alloc::{Layout, GlobalAlloc};
-use core::{ptr, mem};
+use core::mem;
 use super::Locked;
-use core::ptr::NonNull;
 
 use crate::println;
 
@@ -58,7 +57,7 @@ impl FixedSizeBlockAllocator {
 			let next_head = self.list_heads[idx].take();
 			// Split block up
 			let created_block_ptr =
-				((current_block as *mut ListNode as usize + BLOCK_SIZES[idx]) as *mut ListNode);
+				(current_block as *mut ListNode as usize + BLOCK_SIZES[idx]) as *mut ListNode;
 			unsafe {
 				created_block_ptr.write(ListNode {
 					next: next_head,
