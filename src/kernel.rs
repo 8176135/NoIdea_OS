@@ -1,56 +1,27 @@
 use crate::interrupts::interrupt_init;
 use crate::gdt::gdt_init;
-use crate::{println, print};
+use crate::{println, print, helper};
 use crate::special_collections::{IncrementingPool, DynamicBitmap};
 use x86_64::instructions::interrupts;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
 use alloc::vec::Vec;
+use alloc::vec;
+use x86_64::{PhysAddr, VirtAddr};
+use x86_64::structures::idt::InterruptStackFrame;
+use crate::memory::{StackBounds, alloc_stack};
+use volatile::Volatile;
+use crate::kernel::SchedulingLevel::Periodic;
+use x86_64::instructions::interrupts::without_interrupts;
+use core::sync::atomic::AtomicUsize;
+use crate::processes::process::SchedulingLevel::Periodic;
 
-type Name = u64;
-type Pid = u64;
-
-#[derive(Clone, Copy, Debug)]
-struct Registers {}
-
-#[derive(Clone, Copy, Debug)]
-struct Process {
-	pid: u64,
-	regs: Option<Registers>,
-	level: SchedulingLevel,
-	name: Name,
-	arg: i32,
-}
-
-impl Process {
-	// TODO: Implement error type
-	fn new(level: SchedulingLevel, name: Name, arg: i32) -> Result<Process, ()> {
-		match level {
-			SchedulingLevel::Device => {},
-			SchedulingLevel::Periodic => {
-				if !NAME_REGISTRY.lock().set_bit(name as usize) {
-					// Name already taken
-					return Err(())
-				}
-			},
-			SchedulingLevel::Sporadic => {},
-		}
-		let pid = PID_POOL.lock().get_free_elem();
-
-		Ok(Process {
-			pid,
-			regs: None,
-			level,
-			name,
-			arg,
-		})
-	}
-}
+pub static CURRENT_PROCESS: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
-	static ref PROCESSES: Mutex<Vec<Process>> = Mutex::new(Vec::new());
-	static ref PID_POOL: Mutex<IncrementingPool> = Mutex::new(IncrementingPool::new(2));
+	pub static ref PROCESSES: Mutex<Vec<Option<Process>>> = Mutex::new(vec![None; 2]);
+	static ref PID_POOL: Mutex<IncrementingPool> = Mutex::new(IncrementingPool::new(1));
 	static ref NAME_REGISTRY: Mutex<DynamicBitmap> = Mutex::new(DynamicBitmap::new());
 }
 
@@ -59,20 +30,45 @@ pub fn os_init() {
 	gdt_init();
 }
 
-pub fn os_start() {}
-
-#[derive(Copy, Clone, Debug)]
-enum SchedulingLevel {
-	Device = 0,
-	Periodic = 1,
-	Sporadic = 2,
+#[inline(never)]
+pub fn os_start() {
+	// crate::interrupts::hardware::random_thing(123);
+	// crate::context_switch::context_switch(123, Some(123));
+	os_create(123, Periodic, 333, *&test_app);
+	tester(1);
 }
 
-fn os_create<F: FnOnce() -> ()>(f: F, arg: i32, level: SchedulingLevel, name: i32) -> Result<u64, ()>{
-	// Process::new(level, name, arg);
+extern "C" fn os_terminate() -> ! {
+	println!("We out of there!");
+	loop {}
+}
 
-	// Process::new()
-	unimplemented!()
+#[inline(never)]
+fn tester(item: usize) {
+	let other: usize;
+	helper::print_stack_pointer();
+	loop {}
+}
+
+fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -> Result<u64, ()> {
+	let process = Process::new(level, name, arg, f)?;
+	
+	Ok(without_interrupts(|| {
+		let mut lock = PROCESSES.lock();
+		
+		if process.get_idx() >= lock.len() {
+			lock.resize(process.get_idx() + 1, None);
+		}
+		let out_pid = process.pid;
+		
+		assert!(lock[process.get_idx()].is_none(), "PID of new process is not empty");
+		lock[process.get_idx()] = Some(process);
+		out_pid
+	}))
+}
+
+extern "C" fn test_app() {
+	println!("YOLO!!");
 }
 
 pub fn os_abort() {

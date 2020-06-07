@@ -2,9 +2,11 @@ use pic8259_simple::ChainedPics;
 use x86_64::structures::idt::InterruptStackFrame;
 use lazy_static::lazy_static;
 use crate::{print, println};
+use core::intrinsics::breakpoint;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
+pub const SYSCALL_IDX: u8 = 0x80;
 
 pub static PICS: spin::Mutex<ChainedPics> = // Remap PIC ports via offset
 	spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
@@ -12,16 +14,55 @@ pub static PICS: spin::Mutex<ChainedPics> = // Remap PIC ports via offset
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum InterruptIndex {
+	Syscall = SYSCALL_IDX,
 	Timer = PIC_1_OFFSET,
 	Keyboard, // +1
 }
 
-pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
-	print!(".");
+#[inline(never)]
+pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut InterruptStackFrame) { // NOTE: Please don't touch, everything relies on the fact that the compiler only uses 0x40 of the stack when executing this function
+	let stack_pointer: usize;
+	let return_pointer;
+	unsafe {
+		llvm_asm!( "
+			mov %rsp, $0
+			": "=r"(stack_pointer): : : "volatile");
+		
+		return_pointer = crate::scheduling::check_schedule(stack_pointer);
+		// x86_64::registers::control::Cr3::read()
+		llvm_asm!( "
+			mov $0, %rsp
+			": : "r" (return_pointer): "rsp" : "volatile");
+	}
 	unsafe {
 		PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer as u8);
 	}
+	unsafe {
+		llvm_asm!( "
+			nop
+			": : : "rax", "rcx", "rdx", "rbx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "rbp" : "volatile");
+	}
 }
+
+// #[inline(never)]
+// pub extern "C" fn random_thing(_stack_frame: usize) {
+// 	let stack_pointer: usize;
+// 	unsafe {
+// 		llvm_asm!( "
+// 	mov %rsp, $0
+// 	": "={rsp}"(stack_pointer): :
+// 	 "rax", "rcx", "rdx", "rbx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" :
+// 	 "volatile");
+//
+// 		let return_pointer = crate::scheduling::check_schedule(stack_pointer);
+//
+// 		llvm_asm!( "
+// 	mov $0, %rsp
+// 	": : "{rsp}" (return_pointer):
+// 	 "rax", "rcx", "rdx", "rbx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" :
+// 	 "volatile");
+// 	}
+// }
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
 	use x86_64::instructions::port::Port;

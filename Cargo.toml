@@ -12,7 +12,11 @@ edition = "2018"
 #[profile.release]
 #panic = "abort"
 
+[profile.release]
+debug = true
+
 [package.metadata.bootimage]
+run-command = ["qemu-system-x86_64", "-drive", "format=raw,file={}", "-S", "-gdb", "tcp::9009"]
 test-args = ["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
 			"-display", "none"]
 test-success-exit-code = 33         # (0x10 << 1) | 1

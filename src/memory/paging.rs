@@ -12,27 +12,32 @@ unsafe impl FrameAllocator<Size4KiB> for EmptyFrameAllocator {
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 pub struct BootInfoFrameAllocator {
-	memory_map: &'static MemoryMap,
+	memory_map: Option<&'static MemoryMap>,
 	next: usize,
 }
 
 impl BootInfoFrameAllocator {
+	
+	pub const fn new() -> Self {
+		BootInfoFrameAllocator {
+			next: 0,
+			memory_map: None
+		}
+	}
+	
 	/// Create a FrameAllocator from the passed memory map.
 	///
 	/// This function is unsafe because the caller must guarantee that the passed
 	/// memory map is valid. The main requirement is that all frames that are marked
 	/// as `USABLE` in it are really unused.
-	pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
-		BootInfoFrameAllocator {
-			memory_map,
-			next: 0,
-		}
+	pub unsafe fn init(&mut self, memory_map: &'static MemoryMap) {
+		self.memory_map = Some(memory_map);
 	}
 	
 	/// Returns an iterator over the usable frames specified in the memory map.
 	fn usable_frames(&self) -> impl Iterator<Item=PhysFrame> {
 		let addr_ranges =
-			self.memory_map.iter()
+			self.memory_map.unwrap().iter()
 				.filter(|r| r.region_type == MemoryRegionType::Usable)
 				.map(|r| r.range.start_addr()..r.range.end_addr());
 		
