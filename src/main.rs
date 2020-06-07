@@ -21,7 +21,6 @@ mod tests;
 mod serial;
 mod interrupts;
 mod gdt;
-mod context_switch;
 mod helper;
 
 // Logic

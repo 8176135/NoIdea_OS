@@ -1,6 +1,7 @@
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use hardware::InterruptIndex;
 use lazy_static::lazy_static;
+use crate::println;
 
 mod cpu;
 pub mod hardware;

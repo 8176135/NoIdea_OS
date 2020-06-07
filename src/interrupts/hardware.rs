@@ -2,7 +2,7 @@ use pic8259_simple::ChainedPics;
 use x86_64::structures::idt::InterruptStackFrame;
 use lazy_static::lazy_static;
 use crate::{print, println};
-use core::intrinsics::breakpoint;
+use crate::processes::PROCESS_MANAGER;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -28,7 +28,10 @@ pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut Interru
 			mov %rsp, $0
 			": "=r"(stack_pointer): : : "volatile");
 		
-		return_pointer = crate::scheduling::check_schedule(stack_pointer);
+		return_pointer = PROCESS_MANAGER.try_lock()
+			.and_then(|mut p_manager| p_manager.next_tick_preempt_process())
+			.map(|c| c.as_u64() as usize)
+			.unwrap_or(stack_pointer);
 		// x86_64::registers::control::Cr3::read()
 		llvm_asm!( "
 			mov $0, %rsp

@@ -12,18 +12,11 @@ use x86_64::{PhysAddr, VirtAddr};
 use x86_64::structures::idt::InterruptStackFrame;
 use crate::memory::{StackBounds, alloc_stack};
 use volatile::Volatile;
-use crate::kernel::SchedulingLevel::Periodic;
 use x86_64::instructions::interrupts::without_interrupts;
 use core::sync::atomic::AtomicUsize;
-use crate::processes::process::SchedulingLevel::Periodic;
-
-pub static CURRENT_PROCESS: AtomicUsize = AtomicUsize::new(0);
-
-lazy_static! {
-	pub static ref PROCESSES: Mutex<Vec<Option<Process>>> = Mutex::new(vec![None; 2]);
-	static ref PID_POOL: Mutex<IncrementingPool> = Mutex::new(IncrementingPool::new(1));
-	static ref NAME_REGISTRY: Mutex<DynamicBitmap> = Mutex::new(DynamicBitmap::new());
-}
+use crate::processes::SchedulingLevel::Periodic;
+use crate::processes::{SchedulingLevel, Name};
+use crate::processes::PROCESS_MANAGER;
 
 pub fn os_init() {
 	interrupt_init();
@@ -38,7 +31,7 @@ pub fn os_start() {
 	tester(1);
 }
 
-extern "C" fn os_terminate() -> ! {
+pub extern "C" fn os_terminate() -> ! {
 	println!("We out of there!");
 	loop {}
 }
@@ -50,21 +43,9 @@ fn tester(item: usize) {
 	loop {}
 }
 
-fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -> Result<u64, ()> {
-	let process = Process::new(level, name, arg, f)?;
-	
-	Ok(without_interrupts(|| {
-		let mut lock = PROCESSES.lock();
-		
-		if process.get_idx() >= lock.len() {
-			lock.resize(process.get_idx() + 1, None);
-		}
-		let out_pid = process.pid;
-		
-		assert!(lock[process.get_idx()].is_none(), "PID of new process is not empty");
-		lock[process.get_idx()] = Some(process);
-		out_pid
-	}))
+fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -> Result<(), ()> {
+	let p_manager_lock = PROCESS_MANAGER.lock();
+	Ok(())
 }
 
 extern "C" fn test_app() {

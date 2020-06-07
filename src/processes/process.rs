@@ -1,22 +1,17 @@
 use x86_64::VirtAddr;
 use super::Name;
+use crate::kernel::os_terminate;
 use crate::memory::{alloc_stack, StackBounds};
-use crate::processes::Pid;
+use crate::processes::{Pid, SchedulingLevel};
+use crate::println;
 
-global_asm!(include_str!("setup_process_stack.s.out"));
+global_asm!(include_str!("../setup_process_stack.s.out"));
 
 extern "C" {
 	fn asm_fake_register(new_stack_addr: usize, terminate_func_addr: usize, program_start_addr: usize) -> usize;
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum SchedulingLevel {
-	Device = 0,
-	Periodic = 1,
-	Sporadic = 2,
-}
-
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ProcessStatus {
 	Yielded = 0,
 	Running = 1,
@@ -39,18 +34,7 @@ pub struct Process {
 
 impl Process {
 	// TODO: Implement error type
-	pub fn new(pid: Pid, level: SchedulingLevel, name: Name, arg: i32, program_start: extern "C" fn()) -> Result<Process, ()> {
-		match level {
-			SchedulingLevel::Device => {}
-			SchedulingLevel::Periodic => {
-				if !NAME_REGISTRY.lock().set_bit(name as usize) {
-					// Name already taken
-					return Err(());
-				}
-			}
-			SchedulingLevel::Sporadic => {}
-		}
-		
+	pub fn new(pid: Pid, level: SchedulingLevel, name: Name, arg: i32, program_start: extern "C" fn()) -> Process {
 		let stack_bounds = alloc_stack(32, &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
 									   &mut *crate::FRAME_ALLOCATOR.lock()).unwrap();
 		
@@ -65,8 +49,8 @@ impl Process {
 			}
 		});
 		
-		println!("{:x}", fake_int_sp);
-		Ok(Process {
+		println!("Fake stack point: {:x}", fake_int_sp);
+		Process {
 			pid,
 			level,
 			status: ProcessStatus::Scheduled,
@@ -74,22 +58,34 @@ impl Process {
 			stack_pointer: VirtAddr::new(fake_int_sp as u64),
 			name,
 			arg,
-		})
+		}
 	}
 	
-	fn get_idx(&self) -> usize {
+	pub fn get_idx(&self) -> usize {
 		self.pid as usize - 1
+	}
+	
+	pub fn get_pid(&self) -> Pid {
+		self.pid
+	}
+	
+	pub fn get_name(&self) -> Name {
+		self.name
 	}
 	
 	pub fn get_stack_pos(&self) -> VirtAddr {
 		self.stack_pointer
 	}
 	
-	pub fn set_regs(&mut self, new_regs: Registers) {
-		self.regs = Some(new_regs);
+	pub fn get_process_scheduling_level(&self) -> SchedulingLevel {
+		self.level
 	}
 	
 	pub fn set_process_status(&mut self, new_status: ProcessStatus) {
+		self.status = new_status;
+	}
 	
+	pub fn get_process_status(&self) -> ProcessStatus {
+		self.status
 	}
 }

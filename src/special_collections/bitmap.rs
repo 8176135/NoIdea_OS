@@ -47,6 +47,17 @@ impl DynamicBitmap {
 		}
 	}
 	
+	/// Returns true if bit is 1
+	pub fn check_bit(&self, n: usize) -> bool {
+		let idx = n / 8;
+		let bitset = 0x1 << (n % 8);
+		if self.data.get(idx).unwrap_or(&0) & bitset != 0 {
+			true
+		} else {
+			false
+		}
+	}
+	
 	pub fn clear_map(&mut self) {
 		for elem in &mut self.data {
 			*elem = 0;
