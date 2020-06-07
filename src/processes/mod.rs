@@ -67,12 +67,36 @@ impl ProcessesManager {
 		}
 		
 		assert!(self.processes_list[process.get_idx()].is_none(), "PID of new process is not empty");
-		self.processes_list[process.get_idx()] = Some(process);
-		
+		let idx = process.get_idx();
+		self.processes_list[idx] = Some(process);
 		
 		Ok(())
 	}
 	
+	pub fn end_current_process(&mut self) {
+		// IDE gives the wrong hint here, current_process is `Process`
+		let current_process = self.get_current_process_mut()
+			.expect("Tried to end a none existant process").clone();
+
+		match current_process.get_process_scheduling_level() {
+			SchedulingLevel::Device => {
+				assert_eq!(self.scheduler.device_queue.pop_front(), Some(current_process.get_pid()),
+						   "Currently executing device not in the front of device queue?");
+				// Could theoretically be faster if we used a linked list. But in practice I doubt it,
+				// as removing anything is unlikely in the first place, and linked list is not cache friendly
+				self.scheduler.device_queue.retain(|&c| c != current_process.get_pid());
+			}
+			SchedulingLevel::Periodic => {
+				self.name_registry.clear_bit(current_process.get_name() as usize);
+			}
+			SchedulingLevel::Sporadic => {
+				assert_eq!(self.scheduler.sporadic_queue.pop_front(), Some(current_process.get_pid()),
+						   "Currently executing sporadic not in the front of sporadic queue?");
+			}
+		}
+		self.processes_list.remove(current_process.get_idx());
+		self.pid_pool.return_elem(current_process.get_pid());
+	}
 	// pub fn get_scheduler(&mut self) -> &mut Scheduler {
 	// 	&mut self.scheduler
 	// }
@@ -139,7 +163,7 @@ impl ProcessesManager {
 		self.scheduler.periodic_time = time;
 		if self.name_registry.check_bit(name as usize) {
 			let mut new_process = self.processes_list.iter_mut()
-				.find(|c| c.map(|c| c.get_name() == name).unwrap_or(false))
+				.find(|c| c.as_ref().map(|c| c.get_name() == name).unwrap_or(false))
 				.expect("Failed to find process with name, even though registered")
 				.as_mut().unwrap(); // This is just to unwrap the process option, which we already checked
 			self.currently_executing_process = new_process.get_pid();

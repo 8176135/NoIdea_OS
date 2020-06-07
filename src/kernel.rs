@@ -33,6 +33,7 @@ pub fn os_start() {
 
 pub extern "C" fn os_terminate() -> ! {
 	println!("We out of there!");
+	PROCESS_MANAGER.lock().end_current_process();
 	loop {}
 }
 

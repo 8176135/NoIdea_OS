@@ -22,7 +22,7 @@ impl IncrementingPool {
 		}
 	}
 	
-	pub fn return_elem(&mut self, name: u64) {
-		self.pool.push(name);
+	pub fn return_elem(&mut self, elem: u64) {
+		self.pool.push(elem);
 	}
 }

@@ -19,7 +19,7 @@ pub enum ProcessStatus {
 }
 
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Process {
 	pid: Pid,
 	// paging_4_address: PhysAddr,
