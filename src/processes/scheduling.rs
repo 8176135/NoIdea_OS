@@ -22,35 +22,29 @@ pub struct Scheduler {
 impl Scheduler {
 	pub fn new(periodic_order: Vec<(Name, usize)>) -> Self {
 		Scheduler {
+			periodic_time: periodic_order[0].1,
 			periodic_order,
 			..Default::default()
 		}
 	}
 	
-	pub fn get_current_periodic_entry(&self) -> (u64, usize) {
-		self.periodic_order[self.periodic_index]
+	/// Check if periodic_time is 0, if yes change to next periodic period, returning new process Name,
+	/// otherwise, return `None`
+	pub fn check_and_change_periodic(&mut self) -> (Name, bool) {
+		if self.periodic_time != 0 {
+			return (self.get_current_periodic_entry().0, false);
+		}
+		self.increment_periodic_index();
+		let (name, time) = self.get_current_periodic_entry();
+		self.periodic_time = time;
+		(name, true)
 	}
 	
-	// pub fn next_tick(&mut self) {
-	// 	self.time += 1;
-	// 	// self.schedule_new_process();
-	// }
-	//
-	// pub fn get_tick(&self) {
-	//
-	// }
+	fn increment_periodic_index(&mut self) {
+		self.periodic_index = (self.periodic_index + 1) % self.periodic_order.len();
+	}
 	
-	// pub fn yielded(&mut self) {
-	// 	PROCESSES.lock()[CURRENT_PROCESS.load(Ordering::Relaxed)].as_ref().unwrap()
-	// 		.set_process_status(ProcessStatus::Yielded);
-	// 	self.schedule_new_process();
-	// }
-	//
-	// fn schedule_new_process(&mut self) {
-	//
-	// }
-	//
-	// pub fn get_periodic_order(&self) -> &[(usize, usize)]{
-	// 	&self.periodic_order
-	// }
+	pub fn get_current_periodic_entry(&self) -> (Name, usize) {
+		self.periodic_order[self.periodic_index]
+	}
 }

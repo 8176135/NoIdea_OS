@@ -3,6 +3,7 @@
 
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
+#![feature(naked_functions)]
 #![feature(llvm_asm)]
 #![feature(const_in_array_repeat_expressions)]
 #![feature(const_fn)]

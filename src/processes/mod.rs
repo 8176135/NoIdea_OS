@@ -73,11 +73,35 @@ impl ProcessesManager {
 		Ok(())
 	}
 	
+	pub fn yield_current_process(&mut self) {
+		let current_process = self.get_current_process_mut()
+			.expect("The idle process is trying to yield");
+		
+		let current_pid = current_process.get_pid();
+		
+		match current_process.get_process_scheduling_level() {
+			SchedulingLevel::Device => {
+				assert_eq!(self.scheduler.device_queue.pop_front(), Some(current_pid),
+						   "Currently executing device not in the front of device queue?");
+				self.schedule_all_the_stuff(false);
+			}
+			SchedulingLevel::Periodic => {
+				current_process.set_process_status(ProcessStatus::Yielded);
+				self.switch_to_sporadic();
+			}
+			SchedulingLevel::Sporadic => {
+				current_process.set_process_status(ProcessStatus::Scheduled);
+				self.scheduler.sporadic_queue.rotate_left(1);
+				self.switch_to_sporadic();
+			}
+		}
+	}
+	
 	pub fn end_current_process(&mut self) {
 		// IDE gives the wrong hint here, current_process is `Process`
 		let current_process = self.get_current_process_mut()
-			.expect("Tried to end a none existant process").clone();
-
+			.expect("The idle process is trying to terminate itself :\\").clone();
+		
 		match current_process.get_process_scheduling_level() {
 			SchedulingLevel::Device => {
 				assert_eq!(self.scheduler.device_queue.pop_front(), Some(current_process.get_pid()),
@@ -117,33 +141,37 @@ impl ProcessesManager {
 					eprintln!("DEVICE TAKING MORE THAN 1 TICK TO COMPLETE!");
 				}
 				SchedulingLevel::Periodic | SchedulingLevel::Sporadic => {
-					if !self.switch_to_next_device() { // If no device is scheduled.
+					if !self.switch_to_device() { // If no device is scheduled.
 						self.scheduler.periodic_time -= 1;
-						if self.scheduler.periodic_time == 0 {
-							// NOTE: Do NOT use `current_process` here, since the borrow checker doesn't understand separate structs
-							self.get_current_process_mut().unwrap().set_process_status(ProcessStatus::Scheduled);
-							if !self.switch_to_next_periodic() { // If no process scheduled for the next time slot
-								if !self.switch_to_next_sporadic() { // No processes in sporadic queue either
-									self.currently_executing_process = 0; // Idle
-								}
+						if !self.switch_to_periodic() { // If no process scheduled for the next time slot
+							if !self.switch_to_sporadic() { // No processes in sporadic queue either
+								self.currently_executing_process = 0; // Idle
 							}
 						}
 					}
 				}
 			}
 		} else {
-			if !self.switch_to_next_device() { // If no device is scheduled.
-				if !self.switch_to_next_periodic() { // If no process scheduled for the next time slot
-					if !self.switch_to_next_sporadic() { // No processes in sporadic queue either
-						self.currently_executing_process = 0; // Keep Idling
-					}
-				}
-			}
+			self.schedule_all_the_stuff(true);
 		}
 		self.get_current_process_mut().map(|c| c.get_stack_pos())
 	}
 	
-	fn switch_to_next_device(&mut self) -> bool {
+	fn schedule_all_the_stuff(&mut self, tick: bool) {
+		if !self.switch_to_device() { // If no device is scheduled.
+			if tick {
+				self.scheduler.periodic_time -= 1;
+			}
+			// NOTE: Do NOT use `current_process` here, since the borrow checker doesn't understand separate structs
+			if !self.switch_to_periodic() { // If no process scheduled for the next time slot
+				if !self.switch_to_sporadic() { // No processes in sporadic queue either
+					self.currently_executing_process = 0; // Idle
+				}
+			}
+		}
+	}
+	
+	fn switch_to_device(&mut self) -> bool {
 		if let Some(new_process) = self.scheduler.device_queue.front()
 			.map(|&c| c) // Copy the value early to workaround borrow checker limitation
 			.map(|new_pid| self.get_process_mut_with_pid(new_pid)
@@ -157,16 +185,35 @@ impl ProcessesManager {
 		}
 	}
 	
-	fn switch_to_next_periodic(&mut self) -> bool {
-		self.scheduler.periodic_index += 1;
-		let (name, time) = self.scheduler.get_current_periodic_entry();
-		self.scheduler.periodic_time = time;
+	fn switch_to_periodic(&mut self) -> bool {
+		// self.get_current_process_mut().unwrap().set_process_status(ProcessStatus::Scheduled);
+		let (name, _next_periodic) = self.scheduler.check_and_change_periodic();
+		
+		// Just because _next_periodic is true doesn't mean process changed.
+		
+		let current_process = self.get_current_process_mut();
+		
+		// Basically if there is nothing that needs changing, return true.
+		if let Some(current_process) = current_process {
+			if current_process.get_process_scheduling_level() == SchedulingLevel::Periodic &&
+				current_process.get_name() == name {
+				return current_process.get_process_status() != ProcessStatus::Yielded; // Return false if yielded, let sporadic schedule
+			}
+		}
+		
+		// Otherwise, figure out the replacement
 		if self.name_registry.check_bit(name as usize) {
+			if let Some(current_process) = self.get_current_process_mut() {
+				current_process.set_process_status(ProcessStatus::Scheduled);
+			}
 			let mut new_process = self.processes_list.iter_mut()
-				.find(|c| c.as_ref().map(|c| c.get_name() == name).unwrap_or(false))
+				.find(|c| c.as_ref()
+					.map(|c| c.get_name() == name).unwrap_or(false))
 				.expect("Failed to find process with name, even though registered")
 				.as_mut().unwrap(); // This is just to unwrap the process option, which we already checked
+			
 			self.currently_executing_process = new_process.get_pid();
+			assert_eq!(new_process.get_process_status(), ProcessStatus::Scheduled);
 			new_process.set_process_status(ProcessStatus::Running);
 			true
 		} else {
@@ -174,13 +221,18 @@ impl ProcessesManager {
 		}
 	}
 	
-	fn switch_to_next_sporadic(&mut self) -> bool {
+	fn switch_to_sporadic(&mut self) -> bool {
 		if let Some(new_process) = self.scheduler.sporadic_queue.front()
 			.map(|&c| c) // Copy the value early to workaround borrow checker limitation
 			.map(|new_pid| self.get_process_mut_with_pid(new_pid)
 				.expect("No entry with pid in process list, PID from sporadic queue, possibly caused by duplicate entries")) {
 			new_process.set_process_status(ProcessStatus::Running);
-			self.currently_executing_process = new_process.get_pid();
+			let new_process_pid = new_process.get_pid();
+			let current_process = self.get_current_process_mut().unwrap();
+			if current_process.get_process_status() == ProcessStatus::Running {
+				current_process.set_process_status(ProcessStatus::Scheduled);
+			}
+			self.currently_executing_process = new_process_pid;
 			true
 		} else {
 			false // No entries in sporadic queue

@@ -17,26 +17,26 @@ asm_fake_register:
 	push rcx // Push code segment
 	push rdx // Push instruction pointer
 
-	// Use the more efficient XOR method to zero out registers
-
-	// Push a bunch of zeros for all the registers
+	// TODO: move this out of assembly file into naked function
+	// Push a bunch of zeros for all the registers 15
 	push rdi //; rbp  // Push the input stack start address to the base stack pointer
-	push rax //; r15
-	push rax //; r14
-	push rax //; r13
-	push rax //; r12
-	push rax //; r11
-	push rax //; r10
-	push rax //; r9
-	push rax //; r8
-	push rax //; rdi
-	push rax //; rsi
-	push rax //; rdx
-	push rax //; rcx
-	push rax //; rbx
-	push rax //; rax
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
+	push rax //;
 
-	sub rsp, <RSP_SUB_VAL> // Change based on build mode in build.rs (This is so stupid, we need a better way of doing this)
+	// NO, just use naked function like a normal person
+	//sub rsp, <RSP_SUB_VAL> // Change based on build mode in build.rs (This is so stupid, we need a better way of doing this)
 	mov rax, rsp // Save new stack pointer in rax, the C return register
 	mov rsp, r8 // Get back our original stack pointer
 

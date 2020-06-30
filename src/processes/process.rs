@@ -5,7 +5,7 @@ use crate::memory::{alloc_stack, StackBounds};
 use crate::processes::{Pid, SchedulingLevel};
 use crate::println;
 
-global_asm!(include_str!("../setup_process_stack.s.out"));
+global_asm!(include_str!("../setup_process_stack.s"));
 
 extern "C" {
 	fn asm_fake_register(new_stack_addr: usize, terminate_func_addr: usize, program_start_addr: usize) -> usize;
@@ -38,7 +38,7 @@ impl Process {
 		let stack_bounds = alloc_stack(32, &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
 									   &mut *crate::FRAME_ALLOCATOR.lock()).unwrap();
 		
-		let terminate_ret_addr = os_terminate as *const () as usize;
+		let terminate_ret_addr = os_terminate as usize;
 		stack_bounds.end();
 		println!("Function address: {:x}", program_start as *const () as usize);
 		let fake_int_sp = x86_64::instructions::interrupts::without_interrupts(|| {

@@ -3,6 +3,7 @@ use x86_64::structures::idt::InterruptStackFrame;
 use lazy_static::lazy_static;
 use crate::{print, println};
 use crate::processes::PROCESS_MANAGER;
+use super::helper_macros::*;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -18,35 +19,51 @@ pub enum InterruptIndex {
 	Timer = PIC_1_OFFSET,
 	Keyboard, // +1
 }
+// _stack_frame: &mut InterruptStackFrame
 
-#[inline(never)]
-pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: &mut InterruptStackFrame) { // NOTE: Please don't touch, everything relies on the fact that the compiler only uses 0x40 of the stack when executing this function
-	let stack_pointer: usize;
-	let return_pointer;
+#[naked]
+pub extern "x86-interrupt" fn timer_interrupt_handler() {
+	// Do I understand what is going on?
 	unsafe {
-		llvm_asm!( "
-			mov %rsp, $0
-			": "=r"(stack_pointer): : : "volatile");
+		interrupt_push!();
+		llvm_asm!("cld" ::: : "volatile");
+		// llvm_asm!("
+		// 	sub    $0x10, %rsp
+		// 	cld
+		// 	lea    0x58(%rsp), %rax
+		// 	mov    %rax, 0x8(%rsp)
+		// " ::: "rax" : "volatile");
 		
-		return_pointer = PROCESS_MANAGER.try_lock()
-			.and_then(|mut p_manager| p_manager.next_tick_preempt_process())
-			.map(|c| c.as_u64() as usize)
-			.unwrap_or(stack_pointer);
-		// x86_64::registers::control::Cr3::read()
-		llvm_asm!( "
-			mov $0, %rsp
-			": : "r" (return_pointer): "rsp" : "volatile");
-	}
-	unsafe {
-		PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer as u8);
-	}
-	unsafe {
-		llvm_asm!( "
-			nop
-			": : : "rax", "rcx", "rdx", "rbx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "rbp" : "volatile");
+		timer_internal();
+		// llvm_asm!("
+		// 	add    $0x10, %rsp
+		// " ::: "rsp" : "volatile");
+		interrupt_pop!();
+		llvm_asm!("iretq" :::: "volatile");
 	}
 }
 
+#[inline(never)]
+unsafe fn timer_internal() {
+	let stack_pointer: usize;
+	let return_pointer;
+
+	llvm_asm!( "
+			mov %rsp, $0
+			": "=r"(stack_pointer): : : "volatile");
+	
+	println!("YAY");
+	return_pointer = PROCESS_MANAGER.try_lock()
+		.and_then(|mut p_manager| p_manager.next_tick_preempt_process())
+		.map(|c| c.as_u64() as usize)
+		.unwrap_or(stack_pointer);
+	
+	llvm_asm!( "
+			mov $0, %rsp
+			": : "r" (return_pointer): "rsp" : "volatile");
+	
+	PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer as u8);
+}
 // #[inline(never)]
 // pub extern "C" fn random_thing(_stack_frame: usize) {
 // 	let stack_pointer: usize;
