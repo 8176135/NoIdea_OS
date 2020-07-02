@@ -15,6 +15,7 @@ pub struct Scheduler {
 	pub periodic_order: Vec<(Name, usize)>,
 	pub periodic_time: usize,
 	pub periodic_index: usize,
+	pub periodic_yielded: bool,
 	pub device_queue: VecDeque<Pid>,
 	pub sporadic_queue: VecDeque<Pid>,
 }
@@ -34,14 +35,17 @@ impl Scheduler {
 		if self.periodic_time != 0 {
 			return (self.get_current_periodic_entry().0, false);
 		}
+		
 		self.increment_periodic_index();
 		let (name, time) = self.get_current_periodic_entry();
 		self.periodic_time = time;
+		self.periodic_yielded = false;
 		(name, true)
 	}
 	
 	fn increment_periodic_index(&mut self) {
 		self.periodic_index = (self.periodic_index + 1) % self.periodic_order.len();
+		println!("Incremented Index: {}", self.periodic_index);
 	}
 	
 	pub fn get_current_periodic_entry(&self) -> (Name, usize) {

@@ -11,6 +11,14 @@ pub struct StackBounds {
 }
 
 impl StackBounds {
+	
+	pub const fn zero() -> StackBounds {
+		StackBounds {
+			start: VirtAddr::zero(),
+			end: VirtAddr::zero()
+		}
+	}
+	
 	pub fn start(&self) -> VirtAddr {
 		self.start
 	}

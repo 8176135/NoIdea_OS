@@ -58,7 +58,7 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 	kernel::os_start();
 	
 	println!("Didn't quite crash");
-	loop {}
+	processes::idle_process();
 }
 
 use core::panic::PanicInfo;

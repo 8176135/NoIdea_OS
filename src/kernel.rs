@@ -59,36 +59,46 @@ pub fn os_start() {
 	// crate::context_switch::context_switch(123, Some(123));
 	// println!("{:?}", x86_64::registers::model_specific::KernelGsBase::read());
 	// println!("{:?}", x86_64::registers::model_specific::GsBase::read());
-	syscall1(SyscallCommand::Yield);
-	// os_create(123, Periodic, 333, *&test_app);
+	// syscall1(SyscallCommand::Yield);
+	println!("test_app: {:x}", test_app as u64);
+	os_create(123, Periodic, 4, *&test_app).unwrap();
+	os_create(234, Periodic, 3, *&test_app).unwrap();
+	os_create(345, Periodic, 2, *&test_app).unwrap();
+	// os_create(456, Periodic, 1, *&test_app).unwrap();
 	// tester(1);
 }
 
-pub extern "C" fn os_terminate() -> ! {
+pub extern "C" fn os_terminate() {
 	println!("We out of there!");
-	PROCESS_MANAGER.lock().end_current_process();
-	
-	loop {} // Wait for the next tick (Probably could yield or something here)
+	syscall1(SyscallCommand::Terminate);
 }
 
-fn os_yield() {
-	PROCESS_MANAGER.lock().yield_current_process();
+pub fn os_yield() {
+	syscall1(SyscallCommand::Yield);
 }
 
-#[inline(never)]
-fn tester(item: usize) {
-	let other: usize;
-	helper::print_stack_pointer();
-	loop {}
+pub fn os_getparam() -> i32 {
+	PROCESS_MANAGER.lock().get_current_process_arg()
 }
+
+// #[inline(never)]
+// fn tester(item: usize) {
+// 	let other: usize;
+// 	helper::print_stack_pointer();
+// 	loop {}
+// }
 
 fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -> Result<(), ()> {
-	let p_manager_lock = PROCESS_MANAGER.lock();
-	Ok(())
+	// No need to turn off interrupts because we lock process_manager
+	let mut p_manager_lock = PROCESS_MANAGER.lock();
+	p_manager_lock.create_new_process(level, name, arg, f)
+	// Ok(())
 }
 
 extern "C" fn test_app() {
-	println!("YOLO!!");
+	println!("Enter the gates: {}", os_getparam());
+	os_yield();
+	println!("YOLO!! {}", interrupts::are_enabled());
 }
 
 pub fn os_abort() {

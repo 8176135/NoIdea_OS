@@ -7,7 +7,6 @@ use super::helper_macros::*;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
-pub const SYSCALL_IDX: u8 = 0x80;
 
 pub static PICS: spin::Mutex<ChainedPics> = // Remap PIC ports via offset
 	spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
@@ -15,7 +14,6 @@ pub static PICS: spin::Mutex<ChainedPics> = // Remap PIC ports via offset
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum InterruptIndex {
-	Syscall = SYSCALL_IDX,
 	Timer = PIC_1_OFFSET,
 	Keyboard, // +1
 }
@@ -34,7 +32,20 @@ pub extern "x86-interrupt" fn timer_interrupt_handler() {
 		// 	mov    %rax, 0x8(%rsp)
 		// " ::: "rax" : "volatile");
 		
-		timer_internal();
+		llvm_asm!( "
+			mov %rsp, %rdi //; Pass rsp as first argument
+			call ${0:c}
+			mov %rax, %rsp
+			": : "i"(timer_internal as u64) : "memory", "rsp" : "volatile", "alignstack");
+		// NOTE: have to cast timer_interval as u64 because of a nightly rust compiler error... I think
+		
+		
+		// let new_stack_pointer = timer_internal(stack_pointer);
+		
+		// llvm_asm!( "
+		// 	mov $0, %rsp
+		// 	":: "r"(new_stack_pointer) : "rsp" : "volatile");
+		
 		// llvm_asm!("
 		// 	add    $0x10, %rsp
 		// " ::: "rsp" : "volatile");
@@ -43,26 +54,19 @@ pub extern "x86-interrupt" fn timer_interrupt_handler() {
 	}
 }
 
+// Has to be C calling convention
 #[inline(never)]
-unsafe fn timer_internal() {
-	let stack_pointer: usize;
-	let return_pointer;
-
-	llvm_asm!( "
-			mov %rsp, $0
-			": "=r"(stack_pointer): : : "volatile");
+unsafe extern "C" fn timer_internal(stack_p: usize) -> usize {
 	
-	println!("YAY");
-	return_pointer = PROCESS_MANAGER.try_lock()
-		.and_then(|mut p_manager| p_manager.next_tick_preempt_process())
+	// println!("YAY");
+	let new_stack_pointer = PROCESS_MANAGER.try_lock()
+		.and_then(|mut p_manager| p_manager.next_tick_preempt_process(stack_p))
 		.map(|c| c.as_u64() as usize)
-		.unwrap_or(stack_pointer);
-	
-	llvm_asm!( "
-			mov $0, %rsp
-			": : "r" (return_pointer): "rsp" : "volatile");
+		.unwrap_or(stack_p);
 	
 	PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer as u8);
+	
+	new_stack_pointer
 }
 // #[inline(never)]
 // pub extern "C" fn random_thing(_stack_frame: usize) {

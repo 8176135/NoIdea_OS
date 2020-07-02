@@ -13,6 +13,9 @@ asm_fake_register:
 	push rax // Push ss (it's just zero)
 	push rcx // Push the stack pointer just before our fake "interrupt"
     pushfq   //; push RFLAGS register to stack TODO: (Currently this is "fine" (it really isn't, since all the other flags will be wrong) since everything is in ring 0, but we need to customize this once we have rings)
+    pop rcx // Move RFLAGs to a temporary register for modification
+    or rcx, 0x0200 // Enable interrupts in the fake rflags
+    push rcx // push it back onto the stack
 	mov rcx, cs // Move cs to temporary register to be pushed
 	push rcx // Push code segment
 	push rdx // Push instruction pointer

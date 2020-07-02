@@ -35,11 +35,14 @@ pub struct Process {
 impl Process {
 	// TODO: Implement error type
 	pub fn new(pid: Pid, level: SchedulingLevel, name: Name, arg: i32, program_start: extern "C" fn()) -> Process {
+		
+		assert_ne!(level, SchedulingLevel::Idle, "Please use idle() to create idle process");
+		
 		let stack_bounds = alloc_stack(32, &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
 									   &mut *crate::FRAME_ALLOCATOR.lock()).unwrap();
 		
 		let terminate_ret_addr = os_terminate as usize;
-		stack_bounds.end();
+
 		println!("Function address: {:x}", program_start as *const () as usize);
 		let fake_int_sp = x86_64::instructions::interrupts::without_interrupts(|| {
 			unsafe {
@@ -49,7 +52,7 @@ impl Process {
 			}
 		});
 		
-		println!("Fake stack point: {:x}", fake_int_sp);
+		println!("Fake stack point: {} {} {:x}", name, pid, fake_int_sp);
 		Process {
 			pid,
 			level,
@@ -61,8 +64,24 @@ impl Process {
 		}
 	}
 	
+	pub const fn idle() -> Process {
+		Process {
+			pid: 0,
+			level: SchedulingLevel::Idle,
+			status: ProcessStatus::Running,
+			stack_bounds: StackBounds::zero(),
+			stack_pointer: VirtAddr::zero(),
+			name: 0,
+			arg: 0,
+		}
+	}
+	
 	pub fn get_idx(&self) -> usize {
 		self.pid as usize - 1
+	}
+	
+	pub fn get_arg(&self) -> i32 {
+		self.arg
 	}
 	
 	pub fn get_pid(&self) -> Pid {
@@ -75,6 +94,10 @@ impl Process {
 	
 	pub fn get_stack_pos(&self) -> VirtAddr {
 		self.stack_pointer
+	}
+	
+	pub fn set_stack_pos(&mut self, new_stack_ptr: VirtAddr) {
+		self.stack_pointer = new_stack_ptr;
 	}
 	
 	pub fn get_process_scheduling_level(&self) -> SchedulingLevel {
