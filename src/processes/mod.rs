@@ -43,7 +43,7 @@ impl ProcessesManager {
 			processes_list: vec![None; 2],
 			currently_executing_process: 0,
 			idle_process: Process::idle(),
-			scheduler: Scheduler::new(vec![(1, 10), (2, 5), (3, 5), (1, 5), (2, 10), (4, 5)]),
+			scheduler: Scheduler::new(vec![(1, 10), (2, 5), (3, 5), (1, 5), (2, 10), (4, 2)]),
 			pid_pool: IncrementingPool::new(1),
 			name_registry: DynamicBitmap::new(),
 		}
@@ -289,7 +289,11 @@ impl ProcessesManager {
 	}
 	
 	fn get_process_mut_with_pid(&mut self, pid: Pid) -> Option<&mut Process> {
-		self.processes_list.get_mut(pid as usize - 1).and_then(|c| c.as_mut())
+		if pid == 0 {
+			Some(&mut self.idle_process)
+		} else {
+			self.processes_list.get_mut(pid as usize - 1).and_then(|c| c.as_mut())
+		}
 	}
 	
 	fn get_process_with_pid(&self, pid: Pid) -> Option<&Process> {

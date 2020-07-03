@@ -43,7 +43,7 @@ impl Process {
 		
 		let terminate_ret_addr = os_terminate as usize;
 		
-		println!("Function address: {:x}", program_start as *const () as usize);
+		// println!("Function address: {:x}", program_start as *const () as usize);
 		let fake_int_sp = x86_64::instructions::interrupts::without_interrupts(|| {
 			unsafe {
 				asm_fake_register(stack_bounds.end().as_u64() as usize,
@@ -52,7 +52,7 @@ impl Process {
 			}
 		});
 		
-		println!("Fake stack point: {} {} {:x}", name, pid, fake_int_sp);
+		// println!("Fake stack point: {} {} {:x}", name, pid, fake_int_sp);
 		Process {
 			pid,
 			level,

@@ -65,7 +65,12 @@ pub fn os_start() {
 	os_create(234, SchedulingLevel::Periodic, 3, *&test_app).unwrap();
 	os_create(345, SchedulingLevel::Periodic, 2, *&test_app).unwrap();
 	os_create(456, SchedulingLevel::Periodic, 1, *&test_app).unwrap();
-	os_create(999, SchedulingLevel::Sporadic, 1, *&test_app_spor).unwrap();
+	os_create(9990, SchedulingLevel::Sporadic, 1, *&test_app_spor).unwrap();
+	os_create(9991, SchedulingLevel::Sporadic, 2, *&test_app_spor).unwrap();
+	os_create(9992, SchedulingLevel::Sporadic, 3, *&test_app_spor).unwrap();
+	os_create(9993, SchedulingLevel::Sporadic, 4, *&test_app_spor).unwrap();
+	os_create(415, SchedulingLevel::Device, 10, *&test_app_device).unwrap();
+	os_create(416, SchedulingLevel::Device, 15, *&test_app_device).unwrap();
 	// os_create(456, Periodic, 1, *&test_app).unwrap();
 	// tester(1);
 }
@@ -109,15 +114,23 @@ extern "C" fn test_app() {
 
 extern "C" fn test_app_spor() {
 	let mut a: i64 = 0;
-	for i in 0..5000000 {
+	let param = os_getparam();
+	for i in 0..10000000 {
 		if i % 1000000 == 0 {
-			println!("SPORE!!!");
+			println!("SPORE!!! {}", param);
+			os_yield();
 		}
 		a.wrapping_add(i);
 	}
-	println!("Primo Victoria: {} {}", os_getparam(), a);
-	os_yield();
-	println!("UNYIELDED!! {}", interrupts::are_enabled());
+	os_create(param + 4, SchedulingLevel::Sporadic, 123, test_app_spor);
+	println!("WE OUT!! {}", param);
+}
+
+extern "C" fn test_app_device() {
+	for i in 0..200 {
+		println!("Reminder for stuff from {} {} ", os_getparam(), i);
+		os_yield();
+	}
 }
 
 pub fn os_abort() {

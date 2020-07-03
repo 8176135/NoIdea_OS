@@ -45,7 +45,7 @@ impl Scheduler {
 	
 	fn increment_periodic_index(&mut self) {
 		self.periodic_index = (self.periodic_index + 1) % self.periodic_order.len();
-		println!("Incremented Index: {}", self.periodic_index);
+		// println!("Incremented Index: {}", self.periodic_index);
 	}
 	
 	pub fn get_current_periodic_entry(&self) -> (Name, usize) {
