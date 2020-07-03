@@ -53,8 +53,6 @@ pub	fn dealloc_stack(
 	frame_deallocator: &mut impl FrameDeallocator<Size4KiB>) {
 	
 	for p in stack_bounds.page_range() {
-		let a =  x86_64::instructions::interrupts::are_enabled();
-		// FIXME: WHY ARE INTERRUPTS ENABLED HERE
 		let (frame, flush) =
 			mapper.unmap(p).expect("Failed to unmap page");
 		flush.flush(); // Is this needed?

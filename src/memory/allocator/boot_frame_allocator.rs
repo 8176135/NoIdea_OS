@@ -30,21 +30,6 @@ impl BootInfoFrameAllocator {
 	/// memory map is valid. The main requirement is that all frames that are marked
 	/// as `USABLE` in it are really unused.
 	pub unsafe fn init(&mut self, memory_map: &'static MemoryMap, physical_memory_offset: VirtAddr) {
-		// let first_usable_addr = memory_map.iter()
-		// 	.filter(|r| r.region_type == MemoryRegionType::Usable)
-		// 	.next().expect("No usable memory").range.start_addr();
-		// self.smallest_memory_addr = first_usable_addr;
-		//
-		// let addr_ranges =
-		// 	memory_map.iter()
-		// 		.filter(|r| r.region_type != MemoryRegionType::Usable)
-		// 		.map(|r| r.range.start_addr()..r.range.end_addr());
-		//
-		// addr_ranges.flat_map(|r| r.step_by(4096))
-		// 	.map(|c| c - first_usable_addr)
-		// 	.for_each(|c| {
-		// 		self.usable_map.set_bit(c as usize);
-		// 	});
 		self.phys_memory_offset = physical_memory_offset;
 		self.phys_frame_iter = Some(Self::usable_frames(memory_map));
 		self.memory_map = Some(memory_map);

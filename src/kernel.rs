@@ -115,8 +115,8 @@ extern "C" fn test_app_spor() {
 	let mut a: i64 = 0;
 	let param = os_getparam();
 	for i in 0..10000000 {
-		if i % 1000000 == 0 {
-			println!("SPORE!!! {}", param);
+		if i % 10000000 == 0 {
+			// println!("SPORE!!! {}", param);
 			os_yield();
 		}
 		a.wrapping_add(i);

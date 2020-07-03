@@ -52,7 +52,7 @@ impl Process {
 			}
 		});
 		
-		// println!("Fake stack point: {} {} {:x}", name, pid, fake_int_sp);
+		println!("Fake stack point: {} {} {:x}", name, pid, fake_int_sp);
 		Process {
 			pid,
 			level,
