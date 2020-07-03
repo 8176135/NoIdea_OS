@@ -35,14 +35,14 @@ pub struct Process {
 impl Process {
 	// TODO: Implement error type
 	pub fn new(pid: Pid, level: SchedulingLevel, name: Name, arg: i32, program_start: extern "C" fn()) -> Process {
-		
 		assert_ne!(level, SchedulingLevel::Idle, "Please use idle() to create idle process");
 		
-		let stack_bounds = alloc_stack(32, &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
+		let stack_bounds = alloc_stack(32,
+									   &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
 									   &mut *crate::FRAME_ALLOCATOR.lock()).unwrap();
 		
 		let terminate_ret_addr = os_terminate as usize;
-
+		
 		println!("Function address: {:x}", program_start as *const () as usize);
 		let fake_int_sp = x86_64::instructions::interrupts::without_interrupts(|| {
 			unsafe {
@@ -94,6 +94,10 @@ impl Process {
 	
 	pub fn get_stack_pos(&self) -> VirtAddr {
 		self.stack_pointer
+	}
+	
+	pub fn get_stack_bounds(&self) -> StackBounds {
+		self.stack_bounds
 	}
 	
 	pub fn set_stack_pos(&mut self, new_stack_ptr: VirtAddr) {

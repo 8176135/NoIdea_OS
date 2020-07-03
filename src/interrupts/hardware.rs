@@ -24,6 +24,7 @@ pub extern "x86-interrupt" fn timer_interrupt_handler() {
 	// Do I understand what is going on?
 	unsafe {
 		interrupt_push!();
+		// Still don't quite understand what this instruction does
 		llvm_asm!("cld" ::: : "volatile");
 		// llvm_asm!("
 		// 	sub    $0x10, %rsp
@@ -32,8 +33,14 @@ pub extern "x86-interrupt" fn timer_interrupt_handler() {
 		// 	mov    %rax, 0x8(%rsp)
 		// " ::: "rax" : "volatile");
 		
+		llvm_asm!("
+			mov rdi, rsp //; Pass rsp as first argument
+			swapgs
+			mov rsp, qword ptr gs:[4] // Get the ring 0 stack pointer
+			swapgs
+		": :  : : "volatile", "intel");
+		
 		llvm_asm!( "
-			mov %rsp, %rdi //; Pass rsp as first argument
 			call ${0:c}
 			mov %rax, %rsp
 			": : "i"(timer_internal as u64) : "memory", "rsp" : "volatile", "alignstack");

@@ -23,20 +23,21 @@ use core::ops::Deref;
 
 pub fn os_init() {
 	interrupt_init();
+	
 	gdt_init();
 	
 	use x86_64::registers::model_specific::{LStar, SFMask, KernelGsBase, Star, Efer, EferFlags, GsBase};
 	// Store syscall location
 	
 	LStar::write(VirtAddr::new(syscall_handler as u64));
-	SFMask::write(RFlags::INTERRUPT_FLAG & RFlags::TRAP_FLAG);
-	let num_to_save = crate::gdt::TSS.deref() as *const _ as u64;
-	KernelGsBase::write(VirtAddr::new(num_to_save));
+	SFMask::write(RFlags::INTERRUPT_FLAG | RFlags::TRAP_FLAG);
+	KernelGsBase::write(VirtAddr::new(crate::gdt::TSS.deref() as *const _ as u64));
+	
 	
 	// FIXME: IDK WHATS GOING ON!!!
 	// I don't understand why GsBase needs to be set, but otherwise `swapgs` doesn't work properly
 	// Or maybe it does work properly.
-	// GsBase::write(VirtAddr::new(num_to_save));
+	// GsBase::write(VirtAddr::new(crate::gdt::TSS.deref() as *const _ as u64));
 	
 	unsafe {
 		Star::write_raw(0, crate::gdt::GDT.1.code_selector.0);
@@ -64,6 +65,7 @@ pub fn os_start() {
 	os_create(123, Periodic, 4, *&test_app).unwrap();
 	os_create(234, Periodic, 3, *&test_app).unwrap();
 	os_create(345, Periodic, 2, *&test_app).unwrap();
+	os_create(456, Periodic, 1, *&test_app).unwrap();
 	// os_create(456, Periodic, 1, *&test_app).unwrap();
 	// tester(1);
 }
@@ -96,7 +98,11 @@ fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -
 }
 
 extern "C" fn test_app() {
-	println!("Enter the gates: {}", os_getparam());
+	let mut a: i64 = 0;
+	for i in 0..5000000 {
+		a.wrapping_add(i);
+	}
+	println!("Enter the gates: {} {}", os_getparam(), a);
 	os_yield();
 	println!("YOLO!! {}", interrupts::are_enabled());
 }

@@ -1,5 +1,7 @@
 use x86_64::VirtAddr;
-use x86_64::structures::paging::{Page, Size4KiB, mapper, FrameAllocator, Mapper};
+use x86_64::structures::paging::{Page, Size4KiB, mapper, FrameAllocator, Mapper, FrameDeallocator};
+use x86_64::structures::paging::page::PageRange;
+use crate::println;
 
 pub mod paging;
 pub mod allocator;
@@ -19,6 +21,11 @@ impl StackBounds {
 		}
 	}
 	
+	pub fn page_range(&self) -> PageRange<Size4KiB> {
+		Page::range(Page::from_start_address(self.start).unwrap(),
+					Page::from_start_address(self.end).unwrap())
+	}
+	
 	pub fn start(&self) -> VirtAddr {
 		self.start
 	}
@@ -28,6 +35,7 @@ impl StackBounds {
 	}
 }
 
+/// We don't have a way to come back down, real question is do we need to? This is all virtual address
 fn reserve_stack_memory(size_in_pages: u64) -> Page {
 	use core::sync::atomic::{AtomicU64, Ordering};
 	static STACK_ALLOC_NEXT: AtomicU64 = AtomicU64::new(0x_5555_5555_0000);
@@ -39,6 +47,22 @@ fn reserve_stack_memory(size_in_pages: u64) -> Page {
 		.expect("`STACK_ALLOC_NEXT` not page aligned")
 }
 
+pub	fn dealloc_stack(
+	stack_bounds: StackBounds,
+	mapper: &mut impl Mapper<Size4KiB>,
+	frame_deallocator: &mut impl FrameDeallocator<Size4KiB>) {
+	
+	for p in stack_bounds.page_range() {
+		let a =  x86_64::instructions::interrupts::are_enabled();
+		// FIXME: WHY ARE INTERRUPTS ENABLED HERE
+		let (frame, flush) =
+			mapper.unmap(p).expect("Failed to unmap page");
+		flush.flush(); // Is this needed?
+		unsafe {
+			frame_deallocator.deallocate_frame(frame); // TODO: does nothing atm
+		}
+	}
+}
 
 pub fn alloc_stack(
 	size_in_pages: u64,

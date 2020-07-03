@@ -1,4 +1,5 @@
-use x86_64::VirtAddr; // Only use 48 bits of 64 bits word
+use x86_64::VirtAddr;
+// Only use 48 bits of 64 bits word
 use x86_64::structures::{tss::TaskStateSegment, gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector}};
 use lazy_static::lazy_static;
 use core::ops::Deref;
@@ -29,6 +30,13 @@ pub fn gdt_init() {
 fn create_task_state_segment() -> TaskStateSegment {
 	let mut tss = TaskStateSegment::new();
 	
+	let kernel_stack =
+		crate::memory::alloc_stack(32,
+								   &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
+								   &mut *crate::FRAME_ALLOCATOR.lock())
+			.expect("Failed to create kernel stack");
+	
+	tss.privilege_stack_table[0] = VirtAddr::new(kernel_stack.end().as_u64());
 	tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
 		let df_stack_start = VirtAddr::from_ptr(unsafe { &DF_STACK });
 		let df_stack_end = df_stack_start + DF_STACK_SIZE;

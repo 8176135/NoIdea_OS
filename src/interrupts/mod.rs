@@ -39,7 +39,7 @@ pub unsafe extern fn syscall_handler() -> ! {
 	// Make sure not to use any registers, somehow
 	llvm_asm!("
 		  swapgs // Load the TSS as temporary storage lol
-		  mov gs:[28], rsp // Move rsp to temporary 'reserved' location in the TSS
+		  mov qword ptr gs:[28], rsp // Move rsp to temporary 'reserved' location in the TSS
 		  push 0  // I think this should be 0, it works with 0.
 		  push qword ptr gs:[28] // Push original rsp
 		  mov qword ptr gs:[28], 0 // Clear the reserved section again
@@ -47,7 +47,6 @@ pub unsafe extern fn syscall_handler() -> ! {
           mov r11, cs // Move cs to temporary register to be pushed, we already pushed r11
           push r11 // Push code segment
           push rcx // Push return pointer
-          swapgs // Move everything back
           "
           :
           :
@@ -55,12 +54,23 @@ pub unsafe extern fn syscall_handler() -> ! {
           : "intel", "volatile");
 	
 	interrupt_push!();
+	// TODO: Make everything use the same syntax
+	
+	llvm_asm!("
+		mov rdi, rsp // Store process rsp as first argument
+		mov rsp, qword ptr gs:[4] // Get the ring 0 stack pointer
+		swapgs // Move gs back to TSS
+	"
+	:
+	:
+	:
+	: "intel", "volatile");
 	
 	llvm_asm!( "
-			mov %rsp, %rdi //; Pass rsp as first argument
-			mov %rax, %rsi //; Pass rax as second argument
+			mov %rax, %rsi //; Pass rax (first argument of syscall) as second argument
 			call ${0:c}
-			mov %rax, %rsp
+			// I don't think we need to save the kernel stack pointer...
+			mov %rax, %rsp // Use return number as stack pointer
 			": : "i"(internal_syscall as u64) : "memory", "rsp", "rdi", "rsi", "rax" : "volatile", "alignstack");
 	
 	interrupt_pop!();

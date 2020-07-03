@@ -93,7 +93,7 @@ impl ProcessesManager {
 				current_process.set_process_status(ProcessStatus::Yielded);
 				self.scheduler.periodic_yielded = true;
 				if !self.switch_to_sporadic() {
-					self.switch_to_idle();
+					self.switch_to_idle(false);
 				}
 			}
 			SchedulingLevel::Sporadic => {
@@ -120,6 +120,10 @@ impl ProcessesManager {
 			self.processes_list[self.currently_executing_process as usize - 1].take()
 				.expect("Current process doesn't exist");
 		
+		crate::memory::dealloc_stack(current_process.get_stack_bounds(),
+									 &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
+									 &mut *crate::FRAME_ALLOCATOR.lock());
+		
 		match current_process.get_process_scheduling_level() {
 			SchedulingLevel::Device => {
 				assert_eq!(self.scheduler.device_queue.pop_front(), Some(current_process.get_pid()),
@@ -140,8 +144,8 @@ impl ProcessesManager {
 		
 		self.pid_pool.return_elem(current_process.get_pid());
 		// Technically we won't be running the idle function, just looping in terminate. But that's fine for now
-		self.switch_to_idle(); // Ehh... maybe do something so the next task can immediately pick up before timer tick
-		
+		self.switch_to_idle(false); // Ehh... maybe do something so the next task can immediately pick up before timer tick
+		self.schedule_all_the_stuff(true);
 		self.get_current_process().get_stack_pos()
 	}
 	
@@ -177,13 +181,19 @@ impl ProcessesManager {
 			}
 			if !self.switch_to_periodic() { // If no process scheduled for the next time slot
 				if !self.switch_to_sporadic() { // No processes in sporadic queue either
-					self.switch_to_idle();
+					self.switch_to_idle(true);
 				}
 			}
 		}
 	}
 	
-	fn switch_to_idle(&mut self) {
+	fn switch_to_idle(&mut self, set_scheduled: bool) {
+		if set_scheduled {
+			let current_process = self.get_current_process_mut();
+			if current_process.get_process_status() == ProcessStatus::Running {
+				current_process.set_process_status(ProcessStatus::Scheduled);
+			}
+		}
 		self.currently_executing_process = 0; // Idle
 		self.idle_process.set_process_status(ProcessStatus::Running);
 	}
@@ -218,7 +228,7 @@ impl ProcessesManager {
 		}
 		
 		if previously_yielded { // If the previous
-			let yielded_process = self.get_process_with_name(old_name)
+			let yielded_process = self.get_process_with_name(old_name, true)
 				.expect("Yielded process not found");
 			assert_eq!(yielded_process.get_process_status(), ProcessStatus::Yielded,
 					   "Previously yielded but not yielded process status, this might be correct (but rare) behaviour though");
@@ -238,9 +248,10 @@ impl ProcessesManager {
 		// Otherwise, figure out the replacement
 		if self.name_registry.check_bit(name as usize) {
 			self.get_current_process_mut().set_process_status(ProcessStatus::Scheduled);
-			let mut new_process = self.get_process_with_name(name).expect("Process not found");
+			let mut new_process = self.get_process_with_name(name, true).expect("Process not found");
 			
-			assert_eq!(new_process.get_process_status(), ProcessStatus::Scheduled);
+			assert_eq!(new_process.get_process_status(), ProcessStatus::Scheduled,
+					   "New process was already running: {}", new_process.get_name());
 			new_process.set_process_status(ProcessStatus::Running);
 			self.currently_executing_process = new_process.get_pid();
 			true
@@ -249,10 +260,11 @@ impl ProcessesManager {
 		}
 	}
 	
-	fn get_process_with_name(&mut self, name: Name) -> Option<&mut Process> {
+	fn get_process_with_name(&mut self, name: Name, periodic_only: bool) -> Option<&mut Process> {
 		self.processes_list.iter_mut()
 			.find(|c| c.as_ref()
-				.map(|c| c.get_name() == name).unwrap_or(false))
+				.map(|c| (!periodic_only || c.get_process_scheduling_level() == SchedulingLevel::Periodic)
+					&& c.get_name() == name).unwrap_or(false))
 			.map(|c| c.as_mut().unwrap() ) // This is just to unwrap the process option, which we already checked
 	}
 	
@@ -302,6 +314,7 @@ impl ProcessesManager {
 	}
 }
 use alloc::format;
+
 pub extern "C" fn idle_process() -> ! {
 	loop {
 		x86_64::instructions::hlt(); // Save some (a lot of) power

@@ -1,6 +1,7 @@
 use x86_64::{VirtAddr, PhysAddr};
-use x86_64::structures::paging::{PageTable, OffsetPageTable, FrameAllocator, Size4KiB, PhysFrame};
+use x86_64::structures::paging::{PageTable, OffsetPageTable, FrameAllocator, Size4KiB, PhysFrame, FrameDeallocator};
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use crate::println;
 
 pub struct EmptyFrameAllocator;
 
@@ -54,6 +55,12 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
 		let frame = self.usable_frames().nth(self.next);
 		self.next += 1;
 		frame
+	}
+}
+
+impl FrameDeallocator<Size4KiB> for BootInfoFrameAllocator {
+	unsafe fn deallocate_frame(&mut self, frame: PhysFrame<Size4KiB>) {
+		// println!("Completely useless deallocation of physical frame");
 	}
 }
 

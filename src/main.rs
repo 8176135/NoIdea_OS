@@ -49,7 +49,7 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 	memory::allocator::init_heap(&mut mapper, &mut *FRAME_ALLOCATOR.lock())
 		.expect("Failed to init heap");
 	*TEMP_MAPPER.lock() = Some(mapper);
-
+	
 	kernel::os_init();
 	
 	#[cfg(test)]
@@ -70,7 +70,9 @@ use x86_64::structures::paging::OffsetPageTable;
 #[cfg(not(test))] // new attribute
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+	x86_64::instructions::interrupts::disable();
 	eprintln!("{}", info);
+
 	loop {
 		x86_64::instructions::hlt();
 	}

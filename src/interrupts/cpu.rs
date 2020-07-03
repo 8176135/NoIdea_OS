@@ -10,11 +10,11 @@ pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut InterruptStac
 }
 
 pub extern "x86-interrupt" fn alignment_handler(stack_frame: &mut InterruptStackFrame, error_code: u64) {
-	println!("EXCEPTION: ALIGNMENT ERROR\n{:#?}\nErrCode: {}", stack_frame, error_code);
+	panic!("EXCEPTION: ALIGNMENT ERROR\n{:#?}\nErrCode: {}", stack_frame, error_code);
 }
 
 pub extern "x86-interrupt" fn gp_handler(stack_frame: &mut InterruptStackFrame, error_code: u64) {
-	println!("EXCEPTION: GENERAL PROTECTION ERROR\n{:#?}\nErrCode: {}", stack_frame, error_code);
+	panic!("EXCEPTION: GENERAL PROTECTION ERROR\n{:#?}\nErrCode: {}", stack_frame, error_code);
 }
 
 pub extern "x86-interrupt" fn stack_segment_handler(stack_frame: &mut InterruptStackFrame, error_code: u64) {
