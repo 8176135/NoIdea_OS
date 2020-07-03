@@ -32,7 +32,6 @@ pub fn os_init() {
 	SFMask::write(RFlags::INTERRUPT_FLAG | RFlags::TRAP_FLAG);
 	KernelGsBase::write(VirtAddr::new(crate::gdt::TSS.deref() as *const _ as u64));
 	
-	
 	// FIXME: IDK WHATS GOING ON!!!
 	// I don't understand why GsBase needs to be set, but otherwise `swapgs` doesn't work properly
 	// Or maybe it does work properly.

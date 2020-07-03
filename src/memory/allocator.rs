@@ -1,4 +1,7 @@
+mod boot_frame_allocator;
 pub mod fixed_pow2_block;
+
+pub use boot_frame_allocator::BootInfoFrameAllocator;
 
 use x86_64::structures::paging::{Mapper, Size4KiB, FrameAllocator, mapper::MapToError, Page, PageTableFlags};
 use x86_64::VirtAddr;

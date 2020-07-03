@@ -1,6 +1,7 @@
 #![no_main]
 #![no_std]
 
+#![feature(type_alias_impl_trait)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
 #![feature(naked_functions)]
@@ -34,7 +35,7 @@ mod special_collections;
 use x86_64::VirtAddr;
 use lazy_static::lazy_static;
 use spin::Mutex;
-use crate::memory::paging::BootInfoFrameAllocator;
+use crate::memory::allocator::BootInfoFrameAllocator;
 
 static FRAME_ALLOCATOR: Mutex<BootInfoFrameAllocator> = Mutex::new(BootInfoFrameAllocator::new());
 static TEMP_MAPPER: Mutex<Option<OffsetPageTable>> = Mutex::new(None);
@@ -44,7 +45,7 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 	
 	let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
 	let mut mapper = unsafe { memory::paging::init(phys_mem_offset) };
-	unsafe { FRAME_ALLOCATOR.lock().init(&boot_info.memory_map) };
+	unsafe { FRAME_ALLOCATOR.lock().init(&boot_info.memory_map, phys_mem_offset) };
 
 	memory::allocator::init_heap(&mut mapper, &mut *FRAME_ALLOCATOR.lock())
 		.expect("Failed to init heap");
