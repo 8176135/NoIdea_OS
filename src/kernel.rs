@@ -14,7 +14,6 @@ use crate::memory::{StackBounds, alloc_stack};
 use volatile::Volatile;
 use x86_64::instructions::interrupts::without_interrupts;
 use core::sync::atomic::AtomicUsize;
-use crate::processes::SchedulingLevel::Periodic;
 use crate::processes::{SchedulingLevel, Name};
 use crate::processes::PROCESS_MANAGER;
 use x86_64::registers::rflags::RFlags;
@@ -62,10 +61,11 @@ pub fn os_start() {
 	// println!("{:?}", x86_64::registers::model_specific::GsBase::read());
 	// syscall1(SyscallCommand::Yield);
 	println!("test_app: {:x}", test_app as u64);
-	os_create(123, Periodic, 4, *&test_app).unwrap();
-	os_create(234, Periodic, 3, *&test_app).unwrap();
-	os_create(345, Periodic, 2, *&test_app).unwrap();
-	os_create(456, Periodic, 1, *&test_app).unwrap();
+	os_create(123, SchedulingLevel::Periodic, 4, *&test_app).unwrap();
+	os_create(234, SchedulingLevel::Periodic, 3, *&test_app).unwrap();
+	os_create(345, SchedulingLevel::Periodic, 2, *&test_app).unwrap();
+	os_create(456, SchedulingLevel::Periodic, 1, *&test_app).unwrap();
+	os_create(999, SchedulingLevel::Sporadic, 1, *&test_app_spor).unwrap();
 	// os_create(456, Periodic, 1, *&test_app).unwrap();
 	// tester(1);
 }
@@ -105,6 +105,19 @@ extern "C" fn test_app() {
 	println!("Enter the gates: {} {}", os_getparam(), a);
 	os_yield();
 	println!("YOLO!! {}", interrupts::are_enabled());
+}
+
+extern "C" fn test_app_spor() {
+	let mut a: i64 = 0;
+	for i in 0..5000000 {
+		if i % 1000000 == 0 {
+			println!("SPORE!!!");
+		}
+		a.wrapping_add(i);
+	}
+	println!("Primo Victoria: {} {}", os_getparam(), a);
+	os_yield();
+	println!("UNYIELDED!! {}", interrupts::are_enabled());
 }
 
 pub fn os_abort() {

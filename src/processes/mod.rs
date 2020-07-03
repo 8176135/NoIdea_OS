@@ -160,7 +160,7 @@ impl ProcessesManager {
 			.map(|c| c.get_pid()));
 		
 		let current_process = self.get_current_process_mut();
-		assert_eq!(current_process.get_process_status(), ProcessStatus::Running, "Currently running process is not running??");
+		assert_eq!(current_process.get_process_status(), ProcessStatus::Running, "Currently running process {} is not running??", current_process.get_arg());
 		// Save the new stack position even if we don't need to change (because it's easier this way)
 		current_process.set_stack_pos(VirtAddr::new(stack_p as u64));
 		match current_process.get_process_scheduling_level() {
@@ -275,11 +275,13 @@ impl ProcessesManager {
 				.expect("No entry with pid in process list, PID from sporadic queue, possibly caused by duplicate entries")) {
 			new_process.set_process_status(ProcessStatus::Running);
 			let new_process_pid = new_process.get_pid();
-			let current_process = self.get_current_process_mut();
-			if current_process.get_process_status() == ProcessStatus::Running {
-				current_process.set_process_status(ProcessStatus::Scheduled);
+			if self.currently_executing_process != new_process_pid {
+				let current_process = self.get_current_process_mut();
+				if current_process.get_process_status() == ProcessStatus::Running {
+					current_process.set_process_status(ProcessStatus::Scheduled);
+				}
+				self.currently_executing_process = new_process_pid;
 			}
-			self.currently_executing_process = new_process_pid;
 			true
 		} else {
 			false // No entries in sporadic queue
