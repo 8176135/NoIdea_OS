@@ -7,7 +7,7 @@ use x86_64::structures::paging::{Mapper, Size4KiB, FrameAllocator, mapper::MapTo
 use x86_64::VirtAddr;
 
 //  These are virtual addresses
-pub const HEAP_START: usize = 0x_1313_1313_0000;
+pub const HEAP_START: usize = 0x_2222_2222_0000;
 pub const HEAP_SIZE: usize = 64 * 1024; // 64 KiB
 
 pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>)

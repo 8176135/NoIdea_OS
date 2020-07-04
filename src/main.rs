@@ -1,6 +1,7 @@
 #![no_main]
 #![no_std]
 
+#![feature(alloc_prelude)]
 #![feature(type_alias_impl_trait)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
@@ -24,6 +25,7 @@ mod serial;
 mod interrupts;
 mod gdt;
 mod helper;
+mod ipc;
 
 // Logic
 mod kernel;
