@@ -58,12 +58,14 @@ impl DynamicBitmap {
 		}
 	}
 	
+	#[allow(dead_code)]
 	pub fn clear_map(&mut self) {
 		for elem in &mut self.data {
 			*elem = 0;
 		}
 	}
 	
+	#[allow(dead_code)]
 	pub fn fill_map(&mut self) {
 		for elem in &mut self.data {
 			*elem = u8::MAX;

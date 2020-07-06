@@ -6,11 +6,11 @@ use spin::Mutex;
 use alloc::vec::Vec;
 use alloc::vec;
 use lazy_static::lazy_static;
+#[allow(unused_imports)]
 use crate::{eprintln, println};
 use crate::processes::scheduling::Scheduler;
 use crate::special_collections::{IncrementingPool, DynamicBitmap};
 use crate::processes::process::ProcessStatus;
-use alloc::collections::VecDeque;
 use x86_64::VirtAddr;
 
 lazy_static! {
@@ -248,7 +248,7 @@ impl ProcessesManager {
 		// Otherwise, figure out the replacement
 		if self.name_registry.check_bit(name as usize) {
 			self.get_current_process_mut().set_process_status(ProcessStatus::Scheduled);
-			let mut new_process = self.get_process_with_name(name, true).expect("Process not found");
+			let new_process = self.get_process_with_name(name, true).expect("Process not found");
 			
 			assert_eq!(new_process.get_process_status(), ProcessStatus::Scheduled,
 					   "New process was already running: {}", new_process.get_name());
@@ -317,6 +317,10 @@ impl ProcessesManager {
 				.expect(&format!("Current process is None, someone forgot to change process number when terminating {}",
 								 self.currently_executing_process))
 		}
+	}
+	
+	pub fn get_current_process_pid(&self) -> Pid {
+		self.currently_executing_process
 	}
 }
 use alloc::format;

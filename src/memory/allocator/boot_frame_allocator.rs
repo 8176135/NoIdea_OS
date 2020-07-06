@@ -71,10 +71,9 @@ impl FrameDeallocator<Size4KiB> for BootInfoFrameAllocator {
 		let addr = frame.start_address();
 		let current_free_lst_loc = self.free_list_loc;
 		self.free_list_loc = addr.as_u64();
-		unsafe {
-			// Prepend to our list of free blocks
-			*(self.phys_memory_offset + self.free_list_loc).as_mut_ptr::<u64>() = current_free_lst_loc;
-		}
+		// Prepend to our list of free blocks
+		*(self.phys_memory_offset + self.free_list_loc).as_mut_ptr::<u64>() = current_free_lst_loc;
+		
 		self.free_list_length += 1;
 	}
 }

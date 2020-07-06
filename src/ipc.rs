@@ -2,9 +2,7 @@ use alloc::collections::VecDeque;
 use spin::Mutex;
 use spin::RwLock;
 use lazy_static::lazy_static;
-use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
-use alloc::boxed::Box;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 pub type FifoKey = u32;

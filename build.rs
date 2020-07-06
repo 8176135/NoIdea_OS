@@ -1,4 +1,3 @@
-use std::env;
 
 fn main() {
 	// let mut input = std::fs::read_to_string("src/setup_process_stack.s").unwrap();

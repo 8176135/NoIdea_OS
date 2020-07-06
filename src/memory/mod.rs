@@ -1,7 +1,6 @@
 use x86_64::VirtAddr;
 use x86_64::structures::paging::{Page, Size4KiB, mapper, FrameAllocator, Mapper, FrameDeallocator};
 use x86_64::structures::paging::page::PageRange;
-use crate::println;
 
 pub mod paging;
 pub mod allocator;

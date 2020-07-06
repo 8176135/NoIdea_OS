@@ -1,13 +1,10 @@
 #[macro_use]
 mod helper_macros;
 
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+use x86_64::structures::idt::InterruptDescriptorTable;
 use hardware::InterruptIndex;
 use lazy_static::lazy_static;
 use num_enum::TryFromPrimitive;
-use crate::println;
-
-use helper_macros::*;
 use core::convert::TryFrom;
 use x86_64::VirtAddr;
 

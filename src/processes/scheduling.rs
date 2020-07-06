@@ -1,12 +1,8 @@
-use crate::println;
-use core::sync::atomic::Ordering;
-use x86_64::instructions::interrupts::without_interrupts;
 use alloc::vec::Vec;
-use lazy_static::lazy_static;
-use spin::Mutex;
-use crate::processes::process::ProcessStatus;
 use alloc::collections::VecDeque;
 use crate::processes::{Pid, Name};
+#[allow(unused_imports)]
+use crate::println;
 
 #[derive(Debug, Default)]
 pub struct Scheduler {

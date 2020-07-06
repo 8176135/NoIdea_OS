@@ -35,7 +35,6 @@ mod processes;
 mod special_collections;
 
 use x86_64::VirtAddr;
-use lazy_static::lazy_static;
 use spin::Mutex;
 use crate::memory::allocator::BootInfoFrameAllocator;
 

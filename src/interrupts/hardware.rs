@@ -1,9 +1,8 @@
 use pic8259_simple::ChainedPics;
 use x86_64::structures::idt::InterruptStackFrame;
 use lazy_static::lazy_static;
-use crate::{print, println};
+use crate::print;
 use crate::processes::PROCESS_MANAGER;
-use super::helper_macros::*;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;

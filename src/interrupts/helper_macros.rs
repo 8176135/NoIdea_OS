@@ -26,21 +26,21 @@ macro_rules! preserved_pop {
 // // Load kernel tls
 // mov rax, 0x18
 // mov fs, ax // can't load value directly into `fs`
-macro_rules! fs_push {
-    () => (llvm_asm!(
-        "
-        push fs
-        "
-        : : : : "intel", "volatile"
-    ));
-}
-
-macro_rules! fs_pop {
-    () => (llvm_asm!(
-        "pop fs"
-        : : : : "intel", "volatile"
-    ));
-}
+// macro_rules! fs_push {
+//     () => (llvm_asm!(
+//         "
+//         push fs
+//         "
+//         : : : : "intel", "volatile"
+//     ));
+// }
+//
+// macro_rules! fs_pop {
+//     () => (llvm_asm!(
+//         "pop fs"
+//         : : : : "intel", "volatile"
+//     ));
+// }
 
 macro_rules! scratch_push {
     () => (llvm_asm!(
