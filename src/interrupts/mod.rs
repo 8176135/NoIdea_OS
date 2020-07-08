@@ -7,6 +7,7 @@ use lazy_static::lazy_static;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
 use x86_64::VirtAddr;
+use crate::println;
 
 mod cpu;
 pub mod hardware;
@@ -85,11 +86,11 @@ extern "C" fn internal_syscall(stack_p: usize, call_num: usize) -> usize {
 	
 	match call_num {
 		SyscallCommand::Yield => {
-			PROCESS_MANAGER.lock()
+			PROCESS_MANAGER.try_lock().expect("Disabled interrupts here, need to deal with locked PM")
 				.yield_current_process(VirtAddr::new(stack_p as u64)).as_u64() as usize
 		},
 		SyscallCommand::Terminate => {
-			PROCESS_MANAGER.lock()
+			PROCESS_MANAGER.try_lock().expect("Disabled interrupts here, need to deal with locked PM")
 				.end_current_process().as_u64() as usize
 		}
 	}

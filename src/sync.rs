@@ -8,10 +8,9 @@
 //
 // type Mutex = Semaphore;
 
-use alloc::collections::VecDeque;
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeSet, BTreeMap};
 use spin::{Mutex, RwLock};
-use crate::processes::Pid;
+use crate::processes::Name;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicI32, Ordering};
 
@@ -25,14 +24,14 @@ lazy_static! { // Using a spinlock semaphore to control my semaphore lol
 #[derive(Debug)]
 pub struct Semaphore {
 	count: AtomicI32,
-	queue: Mutex<VecDeque<Pid>>,
+	queue: Mutex<BTreeSet<Name>>,
 }
 
 impl Semaphore {
 	pub	fn new(count: i32) -> Semaphore {
 		Semaphore {
 			count: AtomicI32::new(count),
-			queue: Mutex::new(VecDeque::new()),
+			queue: Mutex::new(BTreeSet::new()),
 		}
 	}
 	
@@ -46,7 +45,16 @@ impl Semaphore {
 		}
 	}
 	
-	pub fn add_to_wait_queue(&self, pid: Pid) {
-		self.queue.lock().push_back(pid);
+	pub fn add_to_wait_queue(&self, name: Name) {
+		assert_eq!(self.queue.lock().insert(name), false, "Wait queue already has element");
+	}
+	
+	pub fn check_and_pop_if_exists(&self, name: Name) -> bool {
+		self.queue.lock().remove(&name)
+	}
+	
+	pub fn signal(&self) -> bool {
+		let old = self.count.fetch_add(1, Ordering::Relaxed);
+		old + 1 >= 0
 	}
 }

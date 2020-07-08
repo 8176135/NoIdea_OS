@@ -2,6 +2,7 @@
 #![no_std]
 
 #![feature(alloc_prelude)]
+#![feature(option_expect_none)]
 #![feature(type_alias_impl_trait)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]

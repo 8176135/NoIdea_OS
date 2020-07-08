@@ -16,8 +16,7 @@ use crate::ipc::FifoKey;
 use crate::sync::{SemaphoreId, SEMAPHORE_STORE, Semaphore};
 use x86_64::instructions::interrupts::{without_interrupts,
 									   disable as disable_int,
-									   enable as enable_int,
-									   are_enabled as int_are_enabled};
+									   enable as enable_int};
 
 pub fn os_init() {
 	interrupt_init();
@@ -47,7 +46,9 @@ pub fn os_init() {
 #[inline(never)]
 pub fn os_start() {
 	// println!("test_app: {:x}", test_app as u64);
-	os_create(123, SchedulingLevel::Periodic, 4, write_test_app).unwrap();
+	os_create(123, SchedulingLevel::Periodic, 1, test_app_signals).unwrap();
+	os_create(123, SchedulingLevel::Sporadic, 4, test_app_signals_recv).unwrap();
+	// os_create(123, SchedulingLevel::Periodic, 4, write_test_app).unwrap();
 	// os_create(123, SchedulingLevel::Periodic, 4, test_app).unwrap();
 	// os_create(234, SchedulingLevel::Periodic, 3, test_app).unwrap();
 	// os_create(345, SchedulingLevel::Periodic, 2, test_app).unwrap();
@@ -152,11 +153,15 @@ pub fn os_wait(id: SemaphoreId) -> Result<(), ()> {
 			// Check what page table / stack frame we are in?
 			// Again we have to reference the process manager to know what belongs to who
 			// !!!!
-			entry.add_to_wait_queue(
-				PROCESS_MANAGER.try_lock()
-					.expect("I just knew there was going to be a deadlock here")
-					.get_current_process_pid());
+			let pm = PROCESS_MANAGER.try_lock()
+				.expect("I just knew there was going to be a deadlock here");
 			
+			if pm.get_current_scheduling_level() == SchedulingLevel::Periodic {
+				// Only matters for periodic devices, as they are the only ones that can yield and then preempt
+				entry.add_to_wait_queue(pm.get_current_process_name());
+			}
+			
+			drop(pm);
 			drop(store);
 			
 			while {
@@ -165,6 +170,7 @@ pub fn os_wait(id: SemaphoreId) -> Result<(), ()> {
 				disable_int();
 				let store =
 					SEMAPHORE_STORE.try_read().expect("DEADLOCK");
+				
 				// Since we can't delete semaphores, I just expect this to work
 				// Break the loop when we get the lock
 				!store.get(&id).unwrap().wait()
@@ -175,8 +181,23 @@ pub fn os_wait(id: SemaphoreId) -> Result<(), ()> {
 	})
 }
 
-pub fn os_signal(id: SemaphoreId) {
-
+pub fn os_signal(id: SemaphoreId) -> Result<(), ()> {
+	without_interrupts(|| {
+		let mut pm = PROCESS_MANAGER.try_lock().unwrap();
+		let store = SEMAPHORE_STORE.read();
+		let sem = store.get(&id).ok_or(())?;
+		sem.signal();
+		if sem.check_and_pop_if_exists(pm.get_scheduled_name()) {
+			pm.unyield_current_periodic();
+			drop(store);
+			drop(pm);
+			enable_int();
+			os_yield();
+			disable_int();
+		}
+		
+		Ok(())
+	})
 }
 
 extern "C" fn test_app() {
@@ -193,6 +214,27 @@ extern "C" fn test_app() {
 	os_write(arg as u32, format!("Enter the gates: {}", a).as_bytes()).unwrap();
 	stuff.resize(20000, 0);
 	os_write(arg as u32, "Ends".as_bytes()).unwrap();
+}
+
+extern "C" fn test_app_signals() {
+	println!("Before Init");
+	os_init_sem(123, 1).unwrap();
+	os_wait(123).unwrap();
+	let mut a: i32 = 0;
+	for i in 0..20000000 {
+		if i % 1000000 == 0 {
+			println!("{}", i);
+		}
+		a = a.wrapping_add(i);
+	}
+	println!("Out");
+	os_signal(123);
+}
+
+extern "C" fn test_app_signals_recv() {
+	println!("Before!!");
+	os_wait(123).unwrap();
+	println!("After");
 }
 
 extern "C" fn write_test_app() {
@@ -217,7 +259,7 @@ extern "C" fn read_test_app() {
 	let (out, remaining): (String, _) =
 		postcard::take_from_bytes(remaining).expect("Failed to deserialize msg");
 	println!("Read!! {:?}", out);
-	let (out, remaining): (String, _) =
+	let (out, _remaining): (String, _) =
 		postcard::take_from_bytes(remaining).expect("Failed to deserialize msg");
 	println!("Read!! {:?}", out);
 	println!("Read!! {}", length_read);

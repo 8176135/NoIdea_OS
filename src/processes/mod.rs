@@ -322,6 +322,24 @@ impl ProcessesManager {
 	pub fn get_current_process_pid(&self) -> Pid {
 		self.currently_executing_process
 	}
+	
+	pub fn get_current_process_name(&self) -> Name {
+		self.get_current_process().get_name()
+	}
+	
+	pub fn get_current_scheduling_level(&self) -> SchedulingLevel {
+		self.get_current_process().get_process_scheduling_level()
+	}
+	
+	pub fn get_scheduled_name(&self) -> Name {
+		self.scheduler.get_current_periodic_entry().0
+	}
+	
+	pub fn unyield_current_periodic(&mut self) {
+		assert_eq!(self.scheduler.periodic_yielded, true,
+				   "I'm not actually sure this assert should be true, so just remove it if it's giving trouble");
+		self.scheduler.periodic_yielded = false;
+	}
 }
 use alloc::format;
 
