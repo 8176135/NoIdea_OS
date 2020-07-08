@@ -17,6 +17,8 @@ pub mod hardware;
 pub enum SyscallCommand {
 	Yield = 10,
 	Terminate,
+	/// Temporary solution to stop the testers.
+	TerminateEverythingElse,
 }
 
 lazy_static! {
@@ -93,17 +95,36 @@ extern "C" fn internal_syscall(stack_p: usize, call_num: usize) -> usize {
 			PROCESS_MANAGER.try_lock().expect("Disabled interrupts here, need to deal with locked PM")
 				.end_current_process().as_u64() as usize
 		}
+		SyscallCommand::TerminateEverythingElse => {
+			PROCESS_MANAGER.try_lock().expect("Disabled interrupts here, need to deal with locked PM")
+				.end_all_other_processes();
+			stack_p
+		}
 	}
 }
+
+// Reference: https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
 
 #[inline(always)]
 pub fn syscall1(call_num: SyscallCommand) -> u64 {
 	let ret: u64;
 	unsafe {
-		llvm_asm!("syscall" : "={rax}" (ret) : "{rax}" (call_num as u64) : "rcx", "r11", "memory" : "volatile");
+		llvm_asm!("syscall" : "={rax}" (ret) : "{rax}" (call_num as u64) :
+			"rcx", "r11", "memory" : "volatile");
 	}
 	ret
 }
+
+#[inline(always)]
+pub fn syscall2(call_num: SyscallCommand, arg1: u64) -> u64 {
+	let ret: u64;
+	unsafe {
+		llvm_asm!("syscall" : "={rax}" (ret) : "{rax}" (call_num as u64), "{rdi}" (arg1) :
+			"rcx", "r11", "memory" : "volatile");
+	}
+	ret
+}
+
 
 fn create_idt() -> InterruptDescriptorTable {
 	let mut idt = InterruptDescriptorTable::new();
@@ -124,7 +145,12 @@ fn create_idt() -> InterruptDescriptorTable {
 	// (We have to do this because we are removing an argument, which we weren't using)
 	// But rust debug builds have a "bug"? where naked functions are not actually naked
 	let timer_interrupt_address = hardware::timer_interrupt_handler as *const ();
-	idt[InterruptIndex::Timer as u8 as usize].set_handler_fn(unsafe { core::mem::transmute(timer_interrupt_address) });
-	idt[InterruptIndex::Keyboard as u8 as usize].set_handler_fn(hardware::keyboard_interrupt_handler);
+	
+	// x86_64 library requires us to pass the correct function signature
+	// But we have a custom naked function, so we just pretend what we passed is correct by transmuting it.
+	idt[InterruptIndex::Timer as u8 as usize]
+		.set_handler_fn(unsafe { core::mem::transmute(timer_interrupt_address) });
+	idt[InterruptIndex::Keyboard as u8 as usize]
+		.set_handler_fn(hardware::keyboard_interrupt_handler);
 	idt
 }

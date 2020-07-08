@@ -23,6 +23,7 @@ lazy_static! { // Using a spinlock semaphore to control my semaphore lol
 
 #[derive(Debug)]
 pub struct Semaphore {
+	initial_count: i32,
 	count: AtomicI32,
 	queue: Mutex<BTreeSet<Name>>,
 }
@@ -30,9 +31,17 @@ pub struct Semaphore {
 impl Semaphore {
 	pub	fn new(count: i32) -> Semaphore {
 		Semaphore {
+			initial_count: count,
 			count: AtomicI32::new(count),
 			queue: Mutex::new(BTreeSet::new()),
 		}
+	}
+	
+	pub fn is_neutral(&self) -> bool {
+		let count = self.count.load(Ordering::Relaxed);
+		((self.initial_count < 0 && count > 0)
+		|| (self.initial_count == count))
+		&& self.queue.try_lock().unwrap().len() == 0 // And Nothing in wait queue
 	}
 	
 	pub fn wait(&self) -> bool {
@@ -53,6 +62,7 @@ impl Semaphore {
 		self.queue.lock().remove(&name)
 	}
 	
+	/// Returns true if current number of users is >= 0
 	pub fn signal(&self) -> bool {
 		let old = self.count.fetch_add(1, Ordering::Relaxed);
 		old + 1 >= 0

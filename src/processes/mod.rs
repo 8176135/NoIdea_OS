@@ -115,38 +115,63 @@ impl ProcessesManager {
 	pub fn end_current_process(&mut self) -> VirtAddr {
 		// TODO: Maybe wipe the stack to prevent other processes from snooping on the memory?
 		
-		// Only use current_process immutably here
-		let current_process =
-			self.processes_list[self.currently_executing_process as usize - 1].take()
-				.expect("Current process doesn't exist");
+		self.end_process_with_pid(self.currently_executing_process);
 		
-		crate::memory::dealloc_stack(current_process.get_stack_bounds(),
-									 &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
-									 &mut *crate::FRAME_ALLOCATOR.lock());
-		
-		match current_process.get_process_scheduling_level() {
-			SchedulingLevel::Device => {
-				assert_eq!(self.scheduler.device_queue.pop_front(), Some(current_process.get_pid()),
-						   "Currently executing device not in the front of device queue?");
-				// Could theoretically be faster if we used a linked list. But in practice I doubt it,
-				// as removing anything is unlikely in the first place, and linked list is not cache friendly
-				self.scheduler.device_queue.retain(|&c| c != current_process.get_pid());
-			}
-			SchedulingLevel::Periodic => {
-				self.name_registry.clear_bit(current_process.get_name() as usize);
-			}
-			SchedulingLevel::Sporadic => {
-				assert_eq!(self.scheduler.sporadic_queue.pop_front(), Some(current_process.get_pid()),
-						   "Currently executing sporadic not in the front of sporadic queue?");
-			}
-			SchedulingLevel::Idle => panic!("The idle processes can't just end!?")
-		}
-		
-		self.pid_pool.return_elem(current_process.get_pid());
 		// Technically we won't be running the idle function, just looping in terminate. But that's fine for now
 		self.switch_to_idle(false); // Ehh... maybe do something so the next task can immediately pick up before timer tick
 		self.schedule_all_the_stuff(true);
 		self.get_current_process().get_stack_pos()
+	}
+	
+	pub fn end_all_other_processes(&mut self) {
+		let pids = self.processes_list
+			.iter()
+			.filter_map(|c| c.as_ref())
+			.map(|c| c.get_pid())
+			.filter(|c| *c != self.currently_executing_process)
+			.collect::<Vec<Pid>>();
+		
+		for pid in pids {
+			self.end_process_with_pid(pid);
+		}
+	}
+	
+	// TODO: add error type
+	fn end_process_with_pid(&mut self, pid: Pid) -> Result<(), ()> {
+		let target_process =
+			self.processes_list[pid as usize - 1].take().ok_or(())?;
+		
+		crate::memory::dealloc_stack(target_process.get_stack_bounds(),
+									 &mut *crate::TEMP_MAPPER.lock().as_mut().unwrap(),
+									 &mut *crate::FRAME_ALLOCATOR.lock());
+		
+		match target_process.get_process_scheduling_level() {
+			SchedulingLevel::Device => {
+				if pid == self.currently_executing_process { // Check if things still align with mental model
+					assert_eq!(self.scheduler.device_queue.pop_front(), Some(target_process.get_pid()),
+							   "Currently executing device not in the front of device queue?");
+				}
+				// We need the following in both cases because there might be multiple instances
+				// of the device in the device queue
+				self.scheduler.device_queue.retain(|&c| c != target_process.get_pid());
+			}
+			SchedulingLevel::Periodic => {
+				self.name_registry.clear_bit(target_process.get_name() as usize);
+			}
+			SchedulingLevel::Sporadic => {
+				if pid == self.currently_executing_process {  // Check if things still align with mental model
+					assert_eq!(self.scheduler.sporadic_queue.pop_front(), Some(target_process.get_pid()),
+							   "Currently executing sporadic not in the front of sporadic queue?");
+				} else {
+					self.scheduler.sporadic_queue.retain(|c| *c != pid);
+				}
+			}
+			SchedulingLevel::Idle => panic!("The idle processes can't just end!?")
+		}
+		self.pid_pool.return_elem(target_process.get_pid());
+		
+		Ok(())
+		
 	}
 	
 	/// Return None when it wants to just continue with whatever we are doing

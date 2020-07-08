@@ -2,7 +2,7 @@
 
 use crate::interrupts::{interrupt_init, syscall1, SyscallCommand, syscall_handler};
 use crate::gdt::gdt_init;
-use crate::println;
+use crate::{println, eprintln};
 use x86_64::instructions::interrupts;
 use spin::Mutex;
 
@@ -39,15 +39,15 @@ pub fn os_init() {
 		Star::write_raw(0, crate::gdt::GDT.1.code_selector.0);
 		Efer::write(Efer::read() | EferFlags::SYSTEM_CALL_EXTENSIONS);
 	}
-	
-	x86_64::instructions::interrupts::enable();
 }
 
 #[inline(never)]
 pub fn os_start() {
 	// println!("test_app: {:x}", test_app as u64);
-	os_create(123, SchedulingLevel::Periodic, 1, test_app_signals).unwrap();
-	os_create(123, SchedulingLevel::Sporadic, 4, test_app_signals_recv).unwrap();
+	os_create(123, SchedulingLevel::Sporadic, 1,
+			  crate::tests::app_test_runner::run_tests).unwrap();
+	// os_create(123, SchedulingLevel::Periodic, 1, test_app_signals).unwrap();
+	// os_create(123, SchedulingLevel::Sporadic, 4, test_app_signals_recv).unwrap();
 	// os_create(123, SchedulingLevel::Periodic, 4, write_test_app).unwrap();
 	// os_create(123, SchedulingLevel::Periodic, 4, test_app).unwrap();
 	// os_create(234, SchedulingLevel::Periodic, 3, test_app).unwrap();
@@ -74,7 +74,7 @@ pub fn os_getparam() -> i32 {
 	PROCESS_MANAGER.lock().get_current_process_arg()
 }
 
-fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -> Result<(), ()> {
+pub(crate) fn os_create(arg: i32, level: SchedulingLevel, name: Name, f: extern "C" fn()) -> Result<(), ()> {
 	// No need to turn off interrupts because we lock process_manager
 	let mut p_manager_lock = PROCESS_MANAGER.lock();
 	p_manager_lock.create_new_process(level, name, arg, f)
@@ -134,6 +134,20 @@ pub fn os_init_sem(id: SemaphoreId, initial_count: i32) -> Result<(), ()> {
 		} else {
 			store.insert(id, Semaphore::new(initial_count));
 			Ok(())
+		}
+	})
+}
+
+// Drop semaphore TODO: Added proper error type.
+pub fn os_drop_sem(id: SemaphoreId) -> Result<(), &'static str> {
+	without_interrupts(|| {
+		let mut store = SEMAPHORE_STORE.try_write().expect("DEADLOCK");
+		let out = store.remove(&id).ok_or("Semaphore Doesn't exist")?;
+		if out.is_neutral() {
+			Ok(())
+		} else {
+			eprintln!("{:?}", out);
+			Err("Semaphore is not neutral") // TODO: Make this a bit easier to debug
 		}
 	})
 }
@@ -198,93 +212,6 @@ pub fn os_signal(id: SemaphoreId) -> Result<(), ()> {
 		
 		Ok(())
 	})
-}
-
-extern "C" fn test_app() {
-	use alloc::format;
-	
-	let mut a: i64 = 0;
-	let arg = os_getparam();
-	let mut stuff: Vec<u8> = Vec::new();
-	for i in 0..5000000 {
-		a = a.wrapping_add(i);
-	}
-	
-	// println!("Enter the gates: {} {}", os_getparam(), a);
-	os_write(arg as u32, format!("Enter the gates: {}", a).as_bytes()).unwrap();
-	stuff.resize(20000, 0);
-	os_write(arg as u32, "Ends".as_bytes()).unwrap();
-}
-
-extern "C" fn test_app_signals() {
-	println!("Before Init");
-	os_init_sem(123, 1).unwrap();
-	os_wait(123).unwrap();
-	let mut a: i32 = 0;
-	for i in 0..20000000 {
-		if i % 1000000 == 0 {
-			println!("{}", i);
-		}
-		a = a.wrapping_add(i);
-	}
-	println!("Out");
-	os_signal(123);
-}
-
-extern "C" fn test_app_signals_recv() {
-	println!("Before!!");
-	os_wait(123).unwrap();
-	println!("After");
-}
-
-extern "C" fn write_test_app() {
-	let stuff = "Yep this works".to_owned();
-	
-	let fifo_stuff = os_init_fifo();
-	os_create(fifo_stuff as i32, SchedulingLevel::Sporadic, 10, read_test_app).unwrap();
-	
-	os_write(fifo_stuff, &postcard::to_allocvec(&stuff).unwrap()).unwrap();
-	os_write(fifo_stuff, &postcard::to_allocvec(&"STUFF".to_owned()).unwrap()).unwrap();
-	os_write(fifo_stuff, &postcard::to_allocvec(&stuff).unwrap()).unwrap();
-	println!("Write!! {}", os_getparam());
-}
-
-extern "C" fn read_test_app() {
-	let fifo_stuff = os_getparam() as u32;
-	let mut stuff_output = [0u8; 40];
-	let length_read = os_read(fifo_stuff, &mut stuff_output).unwrap();
-	let (out, remaining): (String, _) =
-		postcard::take_from_bytes(&stuff_output).expect("Failed to deserialize msg");
-	println!("Read!! {:?}", out);
-	let (out, remaining): (String, _) =
-		postcard::take_from_bytes(remaining).expect("Failed to deserialize msg");
-	println!("Read!! {:?}", out);
-	let (out, _remaining): (String, _) =
-		postcard::take_from_bytes(remaining).expect("Failed to deserialize msg");
-	println!("Read!! {:?}", out);
-	println!("Read!! {}", length_read);
-}
-
-extern "C" fn test_app_spor() {
-	let mut a: i64 = 0;
-	let param = os_getparam();
-	for i in 0..10000000 {
-		if i % 10000000 == 0 {
-			// println!("SPORE!!! {}", param);
-			os_yield();
-		}
-		a = a.wrapping_add(i);
-	}
-	os_create(param + 4, SchedulingLevel::Sporadic, 123, test_app_spor).unwrap();
-	println!("WE OUT!! {}", param);
-}
-
-extern "C" fn test_app_device() {
-	for i in 0..50 {
-		println!("Reminder for stuff from {} {} ", os_getparam(), i);
-		os_yield();
-	}
-	os_create(os_getparam() + 10, SchedulingLevel::Device, (os_getparam() + 10) as u64, test_app_device).unwrap();
 }
 
 pub fn os_abort() {

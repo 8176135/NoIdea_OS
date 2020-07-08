@@ -59,7 +59,7 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 		crate::test_main();
 	
 	kernel::os_start();
-	
+	x86_64::instructions::interrupts::enable();
 	println!("Didn't quite crash");
 	processes::idle_process();
 }
