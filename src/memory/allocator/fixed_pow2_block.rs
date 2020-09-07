@@ -44,9 +44,9 @@ impl FixedSizeBlockAllocator {
 			current_increment_idx -= 1;
 			current_increment_idx > 0
 		} {}
-		println!("{:?}", self.list_heads);
 	}
 	
+	/// Creates and returns some block_idx sized blocks by splitting larger blocks
 	fn split_larger_block(&mut self, block_idx: usize) -> Option<&'static mut ListNode> {
 		let bigger_idx = self.pop_first_larger_block_available(block_idx)?;
 		for idx in (block_idx..bigger_idx).rev() {
@@ -84,6 +84,7 @@ impl FixedSizeBlockAllocator {
 
 fn list_index(layout: &Layout) -> Option<usize> {
 	let required_block_size = layout.size().max(layout.align());
+	// println!("Req: {}", required_block_size);
 	// TODO: Please optimise, though not a big deal
 	BLOCK_SIZES.iter().position(|&s| s >= required_block_size)
 }
@@ -105,8 +106,8 @@ unsafe impl GlobalAlloc for Locked<FixedSizeBlockAllocator> {
 					}
 				}
 			}
-			// TODO: Panic
-			None => panic!("Allocations bigger than 2^16 not supported yet")
+			// TODO: Don't panic
+			None => panic!("Allocations bigger than 2^16 not supported yet, please just make multiple (non continuous) allocations")
 		}
 	}
 	
@@ -126,7 +127,7 @@ unsafe impl GlobalAlloc for Locked<FixedSizeBlockAllocator> {
 				allocator.list_heads[index] = Some(&mut *new_node_ptr);
 			}
 			None => {
-				panic!("Wtf, you can't even allocate this")
+				unreachable!("Wtf, you can't even allocate this")
 			}
 		}
 	}

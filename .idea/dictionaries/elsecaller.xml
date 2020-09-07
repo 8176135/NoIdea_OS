@@ -1,8 +1,10 @@
 <component name="ProjectDictionaryState">
   <dictionary name="elsecaller">
     <words>
+      <w>bootimage</w>
       <w>deallocator</w>
       <w>fifos</w>
+      <w>syscalls</w>
       <w>unyield</w>
       <w>virt</w>
     </words>

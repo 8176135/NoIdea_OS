@@ -1,5 +1,5 @@
 // #![cfg(test)]
-mod applications;
+pub mod applications;
 pub mod app_test_runner;
 
 use crate::{println, print, eprintln, eprint, serial_println, serial_print};

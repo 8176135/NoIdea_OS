@@ -38,8 +38,6 @@ asm_fake_register:
 	push rax //;
 	push rax //;
 
-	// NO, just use naked function like a normal person
-	//sub rsp, <RSP_SUB_VAL> // Change based on build mode in build.rs (This is so stupid, we need a better way of doing this)
 	mov rax, rsp // Save new stack pointer in rax, the C return register
 	mov rsp, r8 // Get back our original stack pointer
 

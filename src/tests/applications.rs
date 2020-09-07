@@ -1,5 +1,5 @@
 use crate::kernel::*;
-use alloc::prelude::v1::*;
+use alloc::prelude::v1::{Vec, ToOwned, String, ToString};
 use crate::processes::SchedulingLevel;
 use super::app_test_runner::TEST_SEMAPHORE_ID;
 use crate::println;
@@ -15,9 +15,28 @@ pub extern "C" fn test_app() {
 	}
 	
 	// println!("Enter the gates: {} {}", os_getparam(), a);
-	os_write(arg as u32, format!("Enter the gates: {}", a).as_bytes()).unwrap();
+	os_write(arg as u32, format!("Periodic Test: {}", a).as_bytes()).unwrap();
 	stuff.resize(20000, 0);
 	os_write(arg as u32, "Ends".as_bytes()).unwrap();
+	os_signal(TEST_SEMAPHORE_ID);
+}
+
+pub extern "C" fn test_app_printer() {
+	use alloc::format;
+	
+	let mut a: i64 = 0;
+	let arg = os_getparam();
+	let mut stuff: Vec<u8> = Vec::new();
+	for i in 0..5000000 {
+		a = a.wrapping_add(i);
+	}
+	
+	stuff.resize(20000, 0);
+	let read_size = os_read(arg as u32, &mut stuff).unwrap();
+	stuff.truncate(read_size);
+	let read_data = String::from_utf8_lossy(&stuff);
+	println!("Test App String Read: {}", read_data);
+	// println!("Enter the gates: {} {}", os_getparam(), a);/
 	os_signal(TEST_SEMAPHORE_ID);
 }
 
@@ -83,12 +102,12 @@ pub extern "C" fn read_test_app() {
 pub extern "C" fn test_app_spor() {
 	let mut a: i64 = 0;
 	let param = os_getparam();
-	for i in 0..10000000 {
+	for i in 0..10_000_000 {
 		// if i % 100000 == 0 {
 		// 	println!("{}", param);
 		// }
-		if i % 1000000 == 0 {
-			println!("SPORE!!! {}", param);
+		if i % 1_000_000 == 0 {
+			println!("Hey, progress {} {}", param, i / 1_000_000);
 			os_yield();
 		}
 		a = a.wrapping_add(i);
@@ -110,6 +129,18 @@ pub extern "C" fn test_app_device() {
 	if param == 20 || param == 25 {
 		os_signal(TEST_SEMAPHORE_ID);
 	}
+}
+
+pub extern "C" fn big_memory() {
+	let param = os_getparam();
+	let mut array_of_arrays = alloc::vec::Vec::with_capacity(16);
+	println!("about to allocate: {} + some more bytes", param);
+	for x in (0..param).step_by(4096 * 4) {
+		let mut array = alloc::vec::Vec::with_capacity((4096 * 4).min(param - x) as usize);
+		array.resize((4096 * 4).min(param) as usize, 255u8);
+		array_of_arrays.push(array);
+	}
+	os_signal(TEST_SEMAPHORE_ID);
 }
 
 fn do_work() {

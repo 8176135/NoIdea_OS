@@ -33,6 +33,12 @@ pub extern "C" fn run_tests() {
 	os_create(9993, SchedulingLevel::Sporadic, 4,test_app_spor).unwrap();
 	os_create(10, SchedulingLevel::Device, 10, test_app_device).unwrap();
 	os_create(15, SchedulingLevel::Device, 15, test_app_device).unwrap();
+	// os_wait(TEST_SEMAPHORE_ID);
+	wait_and_reset_semaphore(TEST_SEMAPHORE_ID, 4);
+	os_create(fifo_key as i32, SchedulingLevel::Periodic, 1, test_app_printer).unwrap();
+	os_create(1000, SchedulingLevel::Sporadic, 199, crate::tests::applications::big_memory).unwrap();
+	os_create(10000, SchedulingLevel::Sporadic, 299, crate::tests::applications::big_memory).unwrap();
+	os_create(100000, SchedulingLevel::Sporadic, 399, crate::tests::applications::big_memory).unwrap();
 	os_wait(TEST_SEMAPHORE_ID);
 	println!("All tests complete, time to kill everything");
 	syscall1(SyscallCommand::TerminateEverythingElse);

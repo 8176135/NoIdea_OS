@@ -59,8 +59,8 @@ pub extern "C" fn _start(boot_info: &'static bootloader::BootInfo) -> ! {
 		crate::test_main();
 	
 	kernel::os_start();
-	x86_64::instructions::interrupts::enable();
 	println!("Didn't quite crash");
+	x86_64::instructions::interrupts::enable();
 	processes::idle_process();
 }
 
@@ -93,6 +93,6 @@ fn panic(info: &PanicInfo) -> ! {
 
 #[alloc_error_handler]
 fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
-	panic!("allocation error: {:?}", layout)
+	panic!("allocation error: {:?}, probably not enough bytes", layout)
 }
 

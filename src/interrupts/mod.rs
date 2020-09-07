@@ -54,7 +54,6 @@ pub unsafe extern fn syscall_handler() -> ! {
           : "intel", "volatile");
 	
 	interrupt_push!();
-	// TODO: Make everything use the same syntax
 	
 	llvm_asm!("
 		mov rdi, rsp // Store process rsp as first argument
@@ -66,6 +65,7 @@ pub unsafe extern fn syscall_handler() -> ! {
 	:
 	: "intel", "volatile");
 	
+	// TODO: Make everything use the same syntax, basically I haven't found a example for how to do rust function calls with the intel syntax lol
 	llvm_asm!( "
 			mov %rax, %rsi //; Pass rax (first argument of syscall) as second argument
 			call ${0:c}

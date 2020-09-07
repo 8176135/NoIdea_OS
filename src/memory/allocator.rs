@@ -8,7 +8,7 @@ use x86_64::VirtAddr;
 
 //  These are virtual addresses
 pub const HEAP_START: usize = 0x_2222_2222_0000;
-pub const HEAP_SIZE: usize = 64 * 1024; // 64 KiB
+pub const HEAP_SIZE: usize = 640 * 1024; // 64 KiB
 
 pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>)
 	-> Result<(), MapToError<Size4KiB>> {
